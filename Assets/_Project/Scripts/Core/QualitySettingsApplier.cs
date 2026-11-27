@@ -28,8 +28,9 @@ namespace TheLastBullet.Core
                 urp.renderScale = def.ResolutionScale;
                 urp.shadowDistance = def.ShadowsEnabled ? 40f : 0f;
                 // URP 17: supportsMainLightShadows is read-only on the asset.
-                // The runtime shadow toggle is the built-in quality setting.
-                QualitySettings.shadows = def.ShadowsEnabled ? ShadowQuality.All : ShadowQuality.Disable;
+                // The runtime shadow toggle is the built-in quality setting
+                // (fully qualified: URP also defines a ShadowQuality enum).
+                QualitySettings.shadows = def.ShadowsEnabled ? UnityEngine.ShadowQuality.All : UnityEngine.ShadowQuality.Disable;
             }
 
             if (GameManager.Instance != null)
