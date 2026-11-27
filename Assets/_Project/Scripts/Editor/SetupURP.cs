@@ -22,6 +22,70 @@ namespace TheLastBullet.Editor
         [MenuItem("The Last Bullet/Setup URP")]
         public static void CreateURPAssetMenu() => EnsureURPAsset();
 
+        /// <summary>
+        /// The scene carries no serialized UI, so the build strips the shaders
+        /// the runtime-created UI needs — uGUI Images render magenta and
+        /// TextMeshPro text is invisible. Force-include them in every build
+        /// (the same pattern TouchScript uses in its build preprocessor).
+        /// Runs in the build preprocessor, so it also applies to UBA builds.
+        /// </summary>
+        public static void EnsureAlwaysIncludedShaders()
+        {
+            const string path = "ProjectSettings/GraphicsSettings.asset";
+            var assets = AssetDatabase.LoadAllAssetsAtPath(path);
+            if (assets == null || assets.Length == 0)
+            {
+                Debug.LogWarning("GraphicsSettings.asset not found at " + path);
+                return;
+            }
+            var so = new SerializedObject(assets[0]);
+            var list = so.FindProperty("m_AlwaysIncludedShaders");
+            if (list == null)
+            {
+                Debug.LogWarning("m_AlwaysIncludedShaders not found in GraphicsSettings");
+                return;
+            }
+            string[] names =
+            {
+                "UI/Default",
+                "TextMeshPro/Distance Field",
+                "TextMeshPro/Distance Field Overlay",
+                "TextMeshPro/Sprite",
+                "Sprites/Default",
+                "Universal Render Pipeline/Lit",
+            };
+            bool changed = false;
+            foreach (var name in names)
+            {
+                var shader = Shader.Find(name);
+                if (shader == null)
+                {
+                    Debug.LogWarning("Shader not found (skipped): " + name);
+                    continue;
+                }
+                bool exists = false;
+                for (int i = 0; i < list.arraySize; i++)
+                {
+                    if (list.GetArrayElementAtIndex(i).objectReferenceValue == shader)
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (exists) continue;
+                int idx = list.arraySize;
+                list.arraySize = idx + 1;
+                list.GetArrayElementAtIndex(idx).objectReferenceValue = shader;
+                changed = true;
+            }
+            if (changed)
+            {
+                so.ApplyModifiedProperties();
+                AssetDatabase.SaveAssets();
+                Debug.Log("Added runtime UI shaders to Always Included Shaders.");
+            }
+        }
+
         /// <summary>Creates the URP asset + renderer if missing and assigns it.
         /// refresh=false skips AssetDatabase.Refresh (used by the build
         /// preprocessor, where a refresh during the build is not wanted).</summary>

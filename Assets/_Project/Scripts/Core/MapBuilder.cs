@@ -30,10 +30,16 @@ namespace TheLastBullet.Core
             ground.transform.SetParent(_arenaRoot.transform, false);
             ground.transform.localScale = new Vector3(map.ArenaWidth / 10f, 1f, map.ArenaHeight / 10f);
             ground.layer = LayerMask.NameToLayer("Ground");
-            var groundMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            groundMat.color = new Color(0.09f, 0.09f, 0.11f);
-            groundMat.SetFloat("_Smoothness", 0.1f);
-            ground.GetComponent<Renderer>().material = groundMat;
+            var lit = Shader.Find("Universal Render Pipeline/Lit");
+            if (lit != null)
+            {
+                var groundMat = new Material(lit);
+                groundMat.color = new Color(0.09f, 0.09f, 0.11f);
+                groundMat.SetFloat("_Smoothness", 0.1f);
+                ground.GetComponent<Renderer>().material = groundMat;
+            }
+            // else: leave the primitive's default material so a missing
+            // shader can never throw here and break the run.
 
             // Boundary walls (invisible colliders — the player/zombies clamp to
             // the arena in code too, these stop physics bodies from escaping).
@@ -55,22 +61,26 @@ namespace TheLastBullet.Core
                 marker.transform.SetParent(_arenaRoot.transform, false);
                 marker.transform.position = new Vector3(zone.Center.x, 0.02f, zone.Center.y);
                 marker.transform.localScale = new Vector3(zone.Radius * 2f, 0.02f, zone.Radius * 2f);
-                var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                mat.color = open
-                    ? new Color(1f, 0.84f, 0f, 0.25f)
-                    : new Color(0.3f, 0.3f, 0.35f, 0.15f);
-                // Transparent ring: use the URP Lit material in transparent mode.
-                mat.SetFloat("_Surface", 1f);
-                mat.SetFloat("_Blend", 0f);
-                mat.SetFloat("_AlphaClip", 0f);
-                mat.SetFloat("_SrcBlend", 1f);
-                mat.SetFloat("_DstBlend", 10f);
-                mat.SetFloat("_ZWrite", 0f);
-                mat.DisableKeyword("_ALPHATEST_ON");
-                mat.EnableKeyword("_ALPHABLEND_ON");
-                mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                mat.renderQueue = 3000;
-                marker.GetComponent<Renderer>().material = mat;
+                var lit = Shader.Find("Universal Render Pipeline/Lit");
+                if (lit != null)
+                {
+                    var mat = new Material(lit);
+                    mat.color = open
+                        ? new Color(1f, 0.84f, 0f, 0.25f)
+                        : new Color(0.3f, 0.3f, 0.35f, 0.15f);
+                    // Transparent ring: use the URP Lit material in transparent mode.
+                    mat.SetFloat("_Surface", 1f);
+                    mat.SetFloat("_Blend", 0f);
+                    mat.SetFloat("_AlphaClip", 0f);
+                    mat.SetFloat("_SrcBlend", 1f);
+                    mat.SetFloat("_DstBlend", 10f);
+                    mat.SetFloat("_ZWrite", 0f);
+                    mat.DisableKeyword("_ALPHATEST_ON");
+                    mat.EnableKeyword("_ALPHABLEND_ON");
+                    mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                    mat.renderQueue = 3000;
+                    marker.GetComponent<Renderer>().material = mat;
+                }
                 var col = marker.GetComponent<Collider>();
                 if (col != null) Object.Destroy(col);
                 _zoneMarkers.Add(marker);

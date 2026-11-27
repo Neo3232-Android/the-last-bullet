@@ -19,6 +19,7 @@ namespace TheLastBullet.Editor
         {
             BuildScript.ApplyPlayerSettings();
             SetupURP.EnsureURPAsset(refresh: false);
+            SetupURP.EnsureAlwaysIncludedShaders();
         }
     }
 }
