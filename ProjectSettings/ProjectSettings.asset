@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 22
+  productGUID: d42d8e318ea1479ea9045a86bc4baca5
+  companyName: Neo
+  productName: The Last Bullet
+  defaultCursor: {fileID: 0}
+  cursorHotspot: {x: 0, y: 0}
+  defaultScreenWidth: 1080
+  defaultScreenHeight: 2400
+  defaultScreenWidthWeb: 960
+  defaultScreenHeightWeb: 600
+  m_StereoRenderingPath: 0
+  m_ActiveColorSpace: 1
+  m_MTRendering: 1
+  m_StackTraceTypes: 010000000100000001000000010000000100000001000000
+  bundleVersion: 0.1.0
+  preloadedAssets: []
+  applicationIdentifier:
+    Android: com.neo.thelastbullet
+    Standalone: com.neo.thelastbullet
+  buildNumber:
+    Standalone: 0
+    iPhone: 0
+    Android: 1
+  AndroidBundleVersionCode: 1
+  AndroidMinSdkVersion: 26
+  AndroidTargetSdkVersion: 36
+  defaultScreenOrientation: 1
+  scriptingBackend:
+    Android: 1
+    Standalone: 0
+  apiCompatibilityLevelPerPlatform:
+    Android: 3
+    Standalone: 3
+  runInBackground: true
+  usePlayerLog: true
+  stripEngineCode: true
+  managedStrippingLevel: 2

@@ -1,0 +1,4 @@
+OK: zombies/summerengine/shambler-run-anim.glb -> zombies/summerengine/shambler-run-anim.fbx
+OK: zombies/summerengine/shambler-walk-anim.glb -> zombies/summerengine/shambler-walk-anim.fbx
+
+Converted: 2, skipped: 0

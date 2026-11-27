@@ -1,0 +1,1 @@
+{"allowUnsafeCode":false,"autoReferenced":true,"defineConstraints":[],"excludePlatforms":[],"includePlatforms":["Editor"],"name":"TheLastBullet.Tests","noEngineReferences":false,"overrideReferences":false,"precompiledReferences":[],"references":["TheLastBullet","UnityEngine.TestRunner"],"rootNamespace":"","versionDefines":[]}
