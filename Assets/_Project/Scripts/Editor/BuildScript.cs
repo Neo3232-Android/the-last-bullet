@@ -61,7 +61,10 @@ namespace TheLastBullet.Editor
             // (InputSystemUIInputModule on the EventSystem) while the
             // twin-stick controls read the old Input Manager (Input.touches).
             // "Both" keeps both alive; either one alone kills the other.
-            PlayerSettings.activeInputHandler = InputHandler.Both;
+            // NOTE: there is NO public C# API for this in Unity 6000.3 —
+            // PlayerSettings.activeInputHandler does not exist (build #17
+            // failed on CS0117/CS0103 for it). The setting lives in
+            // ProjectSettings.asset as activeInputHandler: 2 (Both).
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
             PlayerSettings.allowedAutorotateToLandscapeLeft = false;
             PlayerSettings.allowedAutorotateToLandscapeRight = false;

@@ -28,7 +28,8 @@ PlayerSettings:
     Android: 1
   AndroidBundleVersionCode: 1
   AndroidMinSdkVersion: 26
-  AndroidTargetSdkVersion: 36
+  AndroidTargetSdkVersion: 35
+  activeInputHandler: 2
   defaultScreenOrientation: 1
   scriptingBackend:
     Android: 1

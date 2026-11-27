@@ -381,7 +381,7 @@ namespace TheLastBullet.Core
             // button is dead (the menu renders but taps do nothing — the
             // "frozen menu" bug Mohammed hit in build 14). The old Input
             // Manager stays alive for the twin-stick controls because
-            // BuildScript sets activeInputHandler to Both.
+            // ProjectSettings.asset sets the input handling to Both.
             if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
             {
                 var es = new GameObject("EventSystem");

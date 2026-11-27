@@ -79,21 +79,22 @@ def main():
                     print(f"MISSING: {name} needs 'TheLastBullet' (used in {os.path.relpath(cs, ROOT)})")
                     problems += 1
             # Fully-qualified references (no using directive) that live in a
-            # package assembly: InputSystemUIInputModule is in the
-            # UnityEngine.InputSystem.UI NAMESPACE (Input System 1.1+,
-            # verified against the 1.14.2 package source) but the
-            # Unity.InputSystem ASSEMBLY. Build #15 failed on the missing
-            # assembly reference (CS0234) and build #16 on the wrong
-            # namespace (the old UnityEngine.EventSystems one no longer
-            # exists), so the checker must catch both even without a using
-            # directive.
-            if re.search(r"EventSystems\.InputSystemUIInputModule", src):
+            # package assembly. Use comment-stripped source so mentions in
+            # comments do not trigger false positives.
+            code = re.sub(r"//.*", "", src)
+            if re.search(r"EventSystems\.InputSystemUIInputModule", code):
                 print(f"WRONG NAMESPACE: {name} uses 'UnityEngine.EventSystems.InputSystemUIInputModule' in {os.path.relpath(cs, ROOT)} — the type moved to UnityEngine.InputSystem.UI in Input System 1.1+")
                 problems += 1
-            if re.search(r"\bInputSystemUIInputModule\b", src) and "Unity.InputSystem" not in refs:
+            # PlayerSettings.activeInputHandler has NO public C# API in Unity
+            # 6000.3 (build #17 failed on CS0117/CS0103 for it). The setting
+            # lives in ProjectSettings.asset as activeInputHandler: 2 (Both).
+            if re.search(r"\bactiveInputHandler\b", code):
+                print(f"NO SUCH API: {name} uses 'activeInputHandler' in {os.path.relpath(cs, ROOT)} — set it in ProjectSettings.asset (activeInputHandler: 2) instead")
+                problems += 1
+            if re.search(r"\bInputSystemUIInputModule\b", code) and "Unity.InputSystem" not in refs:
                 print(f"MISSING: {name} needs 'Unity.InputSystem' (fully-qualified InputSystemUIInputModule in {os.path.relpath(cs, ROOT)})")
                 problems += 1
-            if re.search(r"UnityEngine\.InputSystem\.", src) and "Unity.InputSystem" not in refs:
+            if re.search(r"UnityEngine\.InputSystem\.", code) and "Unity.InputSystem" not in refs:
                 print(f"MISSING: {name} needs 'Unity.InputSystem' (fully-qualified UnityEngine.InputSystem.* in {os.path.relpath(cs, ROOT)})")
                 problems += 1
     if problems:
