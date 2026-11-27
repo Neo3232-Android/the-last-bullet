@@ -61,10 +61,10 @@ namespace TheLastBullet.Core
                 marker.transform.SetParent(_arenaRoot.transform, false);
                 marker.transform.position = new Vector3(zone.Center.x, 0.02f, zone.Center.y);
                 marker.transform.localScale = new Vector3(zone.Radius * 2f, 0.02f, zone.Radius * 2f);
-                var lit = Shader.Find("Universal Render Pipeline/Lit");
-                if (lit != null)
+                var ringLit = Shader.Find("Universal Render Pipeline/Lit");
+                if (ringLit != null)
                 {
-                    var mat = new Material(lit);
+                    var mat = new Material(ringLit);
                     mat.color = open
                         ? new Color(1f, 0.84f, 0f, 0.25f)
                         : new Color(0.3f, 0.3f, 0.35f, 0.15f);
