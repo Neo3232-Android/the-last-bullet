@@ -37,13 +37,14 @@ namespace TheLastBullet.Editor
             var renderer = ScriptableObject.CreateInstance<UniversalRendererData>();
             AssetDatabase.CreateAsset(renderer, RendererPath);
 
-            var pipeline = ScriptableObject.CreateInstance<UniversalRenderPipelineAsset>();
+            // URP 17: SetRenderer() is internal (not public API). The public
+            // factory attaches the renderer when the asset is created.
+            var pipeline = UniversalRenderPipelineAsset.Create(renderer);
             pipeline.renderScale = 1f;
             pipeline.supportsHDR = true;
             pipeline.msaaSampleCount = 4;
             pipeline.shadowDistance = 50f;
             AssetDatabase.CreateAsset(pipeline, PipelinePath);
-            pipeline.SetRenderer(0, renderer);
 
             GraphicsSettings.renderPipelineAsset = pipeline;
             AssetDatabase.SaveAssets();
