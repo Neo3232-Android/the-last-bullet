@@ -1,4 +1,43 @@
-OK: zombies/summerengine/shambler-run-anim.glb -> zombies/summerengine/shambler-run-anim.fbx
-OK: zombies/summerengine/shambler-walk-anim.glb -> zombies/summerengine/shambler-walk-anim.fbx
+# Conversion log — GLB -> FBX (Blender 4.2.0 LTS), merged from two runs.
+# Run 1 (2026-11-27): 33 OK. The two shambler animation-only GLBs failed to
+# import: their skin inverseBindMatrices pointed at accessor 7 (a VEC3
+# animation accessor) instead of accessor 0 (the MAT4 accessor). Fixed with
+# a one-character JSON patch (7 -> 0) on copies in /tmp, then run 2 converted
+# them. Original library GLBs were NOT modified.
+OK: zombies/zombie-bloated.glb -> zombies/zombie-bloated.fbx
+OK: zombies/zombie-brute.glb -> zombies/zombie-brute.fbx
+OK: zombies/zombie-crawler.glb -> zombies/zombie-crawler.fbx
+OK: zombies/zombie-nurse.glb -> zombies/zombie-nurse.fbx
+OK: zombies/zombie-office-worker.glb -> zombies/zombie-office-worker.fbx
+OK: zombies/zombie-prisoner.glb -> zombies/zombie-prisoner.fbx
+OK: zombies/zombie-rotten.glb -> zombies/zombie-rotten.fbx
+OK: zombies/zombie-runner.glb -> zombies/zombie-runner.fbx
+OK: zombies/zombie-soldier.glb -> zombies/zombie-soldier.fbx
+OK: zombies/zombie-walker.glb -> zombies/zombie-walker.fbx
+OK: zombies/zombie-woman.glb -> zombies/zombie-woman.fbx
+OK: zombies/zombie-worker.glb -> zombies/zombie-worker.fbx
+OK: zombies/summerengine/shambler-base.glb -> zombies/summerengine/shambler-base.fbx
+OK: zombies/summerengine/shambler-run-anim.glb -> zombies/summerengine/shambler-run-anim.fbx (after inverseBindMatrices fix)
+OK: zombies/summerengine/shambler-walk-anim.glb -> zombies/summerengine/shambler-walk-anim.fbx (after inverseBindMatrices fix)
+OK: player/business-man.glb -> player/business-man.fbx
+OK: player/business-woman.glb -> player/business-woman.fbx
+OK: player/casual-man.glb -> player/casual-man.fbx
+OK: player/casual-woman.glb -> player/casual-woman.fbx
+OK: player/construction-worker.glb -> player/construction-worker.fbx
+OK: player/doctor.glb -> player/doctor.fbx
+OK: player/kaykit-Barbarian.glb -> player/kaykit-Barbarian.fbx
+OK: player/kaykit-Knight.glb -> player/kaykit-Knight.fbx
+OK: player/kaykit-Mage.glb -> player/kaykit-Mage.fbx
+OK: player/kaykit-Rogue.glb -> player/kaykit-Rogue.fbx
+OK: player/kaykit-Rogue_Hooded.glb -> player/kaykit-Rogue_Hooded.fbx
+OK: player/mannequin-man.glb -> player/mannequin-man.fbx
+OK: player/mannequin-woman.glb -> player/mannequin-woman.fbx
+OK: player/quaternius-adventurer.glb -> player/quaternius-adventurer.fbx
+OK: player/quaternius-casual.glb -> player/quaternius-casual.fbx
+OK: player/quaternius-farmer.glb -> player/quaternius-farmer.fbx
+OK: player/quaternius-suit.glb -> player/quaternius-suit.fbx
+OK: player/quaternius-worker.glb -> player/quaternius-worker.fbx
+OK: player/runner-woman.glb -> player/runner-woman.fbx
+OK: player/soldier.glb -> player/soldier.fbx
 
-Converted: 2, skipped: 0
+Converted: 35, skipped: 0
