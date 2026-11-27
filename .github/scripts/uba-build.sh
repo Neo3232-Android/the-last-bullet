@@ -35,39 +35,45 @@ if echo "$free_tier" | grep -q '"freeTierLimitReached"[[:space:]]*:[[:space:]]*t
   exit 1
 fi
 
-# Start the build. 409 means a build is already pending on this target —
-# wait a little and retry a few times rather than failing immediately.
-build_number=""
-for attempt in 1 2 3 4 5; do
-  http_code="$(curl -s -o /tmp/uba-start.json -w "%{http_code}" "${auth[@]}" \
-    -X POST "${API}${T}/builds" -H "Content-Type: application/json" \
-    -d "{\"clean\": ${CLEAN}}")"
-  if [ "$http_code" = "202" ]; then
-    build_number="$(python3 -c "
+# Download-only mode: UBA_BUILD_NUMBER set means an existing build already
+# succeeded — skip starting a new one and just fetch its artifact.
+build_number="${UBA_BUILD_NUMBER:-}"
+if [ -z "$build_number" ]; then
+  # Start the build. 409 means a build is already pending on this target —
+  # wait a little and retry a few times rather than failing immediately.
+  for attempt in 1 2 3 4 5; do
+    http_code="$(curl -s -o /tmp/uba-start.json -w "%{http_code}" "${auth[@]}" \
+      -X POST "${API}${T}/builds" -H "Content-Type: application/json" \
+      -d "{\"clean\": ${CLEAN}}")"
+    if [ "$http_code" = "202" ]; then
+      build_number="$(python3 -c "
 import json
 d = json.load(open('/tmp/uba-start.json'))
 b = d[0] if isinstance(d, list) else d
 print(b.get('build') or b.get('buildNumber') or b.get('number') or '')
 " 2>/dev/null || echo "")"
-    if [ -n "$build_number" ]; then
-      break
+      if [ -n "$build_number" ]; then
+        break
+      fi
+      echo "::error::Build started but the build number could not be read from the response:"
+      cat /tmp/uba-start.json
+      exit 1
+    elif [ "$http_code" = "409" ]; then
+      echo "A build is already pending on this target (attempt $attempt/5); waiting 60s..."
+      sleep 60
+    else
+      echo "::error::Failed to start the build (HTTP $http_code):"
+      cat /tmp/uba-start.json
+      exit 1
     fi
-    echo "::error::Build started but the build number could not be read from the response:"
-    cat /tmp/uba-start.json
-    exit 1
-  elif [ "$http_code" = "409" ]; then
-    echo "A build is already pending on this target (attempt $attempt/5); waiting 60s..."
-    sleep 60
-  else
-    echo "::error::Failed to start the build (HTTP $http_code):"
-    cat /tmp/uba-start.json
+  done
+
+  if [ -z "$build_number" ]; then
+    echo "::error::Could not start a build — the target stayed busy."
     exit 1
   fi
-done
-
-if [ -z "$build_number" ]; then
-  echo "::error::Could not start a build — the target stayed busy."
-  exit 1
+else
+  echo "Download-only mode: using existing UBA build #$build_number (no new build started)."
 fi
 
 echo "UBA_BUILD_NUMBER=$build_number" > "$STATE_FILE"
@@ -129,10 +135,11 @@ if [ -z "$filename" ]; then
 fi
 
 mkdir -p "$DOWNLOAD_DIR"
-# The download endpoint answers 303 with the signed URL in the JSON body
-# field "url" (no Location header) — read it, then fetch it without auth.
+# The download endpoint answers with the signed URL as a bare JSON string
+# (e.g. "https://...") — older UBA versions wrapped it in {"url": ...}.
+# Accept either shape, then fetch it without auth.
 signed_url="$(curl -s "${auth[@]}" "${API}${T}/builds/${build_number}/download/${filename}" \
-  | python3 -c "import json,sys; print(json.load(sys.stdin).get('url',''))")"
+  | python3 -c "import json,sys; d=json.load(sys.stdin); print(d if isinstance(d,str) else (d.get('url') or d.get('signedUrl') or '') if isinstance(d,dict) else '')")"
 if [ -z "$signed_url" ]; then
   echo "::error::Could not get a download URL for $filename"
   exit 1

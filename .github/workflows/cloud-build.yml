@@ -19,6 +19,10 @@ on:
         description: "Clean build (ignore the target's cached Library)"
         type: boolean
         default: false
+      build_number:
+        description: "Download an existing UBA build instead of starting a new one (leave empty to build)"
+        type: string
+        default: ""
 
 concurrency:
   group: uba-android-main
@@ -46,6 +50,7 @@ jobs:
         run: bash .github/scripts/uba-build.sh
         env:
           CLEAN: ${{ inputs.clean }}
+          UBA_BUILD_NUMBER: ${{ inputs.build_number }}
 
       - name: Upload APK artifact
         if: success()
