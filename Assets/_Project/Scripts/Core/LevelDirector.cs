@@ -736,6 +736,13 @@ namespace TheLastBullet.Core
         }
 
         /// <summary>Win a wave-count mode: bonus coins, daily streak / rescued ally, then end the run.</summary>
+        /// <summary>Timed win (called by GameManager's timer check so the
+        /// +250 win bonus is granted — TickMode's own check is the backstop).</summary>
+        public void CompleteTimedRun()
+        {
+            CompleteModeRun(250);
+        }
+
         private void CompleteModeRun(int bonusCoins)
         {
             if (_levelFinished) return;

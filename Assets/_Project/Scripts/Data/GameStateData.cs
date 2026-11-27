@@ -102,10 +102,10 @@ namespace TheLastBullet.Data
     /// <summary>Wave composition. Port of the Kotlin buildWave — same math.</summary>
     public static class WaveBuilder
     {
-        public static WaveDef BuildWave(int waveNumber, MapDef map, System.Random random)
+        public static WaveDef BuildWave(int waveNumber, MapDef map, System.Random random, float countMultiplier = 1f)
         {
             bool isBoss = waveNumber % 5 == 0;
-            int baseCount = 6 + waveNumber * 3;
+            int baseCount = (int)((6 + waveNumber * 3) * countMultiplier);
             int totalWeight = 0;
             foreach (var w in map.ZombieMix.Values) totalWeight += w;
             if (totalWeight < 1) totalWeight = 1;

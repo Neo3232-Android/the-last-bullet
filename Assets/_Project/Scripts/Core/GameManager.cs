@@ -54,6 +54,8 @@ namespace TheLastBullet.Core
         public int ShotsHit { get; private set; }
         public int KillStreak { get; private set; }
         public List<PerkId> PendingPerkChoices { get; private set; } = new List<PerkId>();
+        /// <summary>Rare gold level-up offer (one super perk), or null.</summary>
+        public ProgressionData.SuperPerkDef PendingSuperPerkOffer { get; private set; }
         public bool Won { get; set; }
         public bool IsSlowMo { get; private set; }
 
@@ -69,7 +71,6 @@ namespace TheLastBullet.Core
         private float _fpsEstimate = 60f;
         private bool _paused;
         private bool _secondWindUsed;
-        private bool _lastStandTriggered;
         private MapDef _map;
         private Vector3 _lastKillPos;
         private bool _hasLastKillPos;
@@ -130,8 +131,9 @@ namespace TheLastBullet.Core
             }
             if (State.Mode == GameMode.Timed && State.TimeSurvivedSec >= TimedModeDurationSec)
             {
-                Won = true;
-                EndRun();
+                // Timed win routes through the LevelDirector so the +250 win
+                // bonus is granted (CompleteModeRun also ends the run).
+                LevelDirector.CompleteTimedRun();
                 return;
             }
 
@@ -208,6 +210,38 @@ namespace TheLastBullet.Core
             LevelDirector.StartEndless(_map);
         }
 
+        // ---- mode entry points (thin wrappers over LevelDirector) ----
+
+        public void StartTimed(MapId mapId)
+        {
+            LevelDirector.StartTimed(MapData.Get(mapId), (int)TimedModeDurationSec);
+        }
+
+        public void StartDefendPoint(MapId mapId)
+        {
+            LevelDirector.StartDefendPoint(MapData.Get(mapId));
+        }
+
+        public void StartEscort(MapId mapId)
+        {
+            LevelDirector.StartEscort(MapData.Get(mapId));
+        }
+
+        public void StartBossRush(MapId mapId)
+        {
+            LevelDirector.StartBossRush(MapData.Get(mapId));
+        }
+
+        public void StartHardcore(MapId mapId, int level)
+        {
+            LevelDirector.StartHardcore(MapData.Get(mapId), level);
+        }
+
+        public void StartDailyChallenge()
+        {
+            LevelDirector.StartDailyChallenge();
+        }
+
         private void StartRun(GameMode mode, MapId mapId)
         {
             Rng = new System.Random(Guid.NewGuid().GetHashCode());
@@ -215,12 +249,12 @@ namespace TheLastBullet.Core
             Score = 0; RunCoins = 0; Kills = 0; Headshots = 0;
             ShotsFired = 0; ShotsHit = 0; KillStreak = 0; _streakTimer = 0f;
             PendingPerkChoices = new List<PerkId>();
+            PendingSuperPerkOffer = null;
             Won = false; IsSlowMo = false; Time.timeScale = 1f;
             _simTime = 0f; _slowMoUntil = 0f; _instaKillUntil = 0f; _coinMultiplierUntil = 0f;
             TodayMutation = ZombieData.MutationForDay(
                 (int)(DateTime.UtcNow.Date - new DateTime(2026, 1, 1)).TotalDays);
             _secondWindUsed = false; _hasLastKillPos = false;
-            _lastStandTriggered = false;
 
             var profile = SaveSystem.Instance != null ? SaveSystem.Instance.Profile : new PlayerProfile();
             var character = SaveSystem.Instance != null ? SaveSystem.Instance.Character : CharacterDef.Default();
@@ -246,6 +280,16 @@ namespace TheLastBullet.Core
             {
                 // Prestige damage bonus applies through the damage multiplier path.
                 State.Player.DamageBonus = profile.PrestigeDamageBonus() - 1f;
+            }
+            // Meta-shop upgrades bought with coins apply every run.
+            if (SaveSystem.Instance != null)
+            {
+                var save = SaveSystem.Instance;
+                State.Player.DamageBonus += save.MetaUpgradeBonus("damage");
+                int bonusHp = (int)save.MetaUpgradeBonus("health");
+                State.Player.MaxHealth += bonusHp;
+                State.Player.Health += bonusHp; // start at full (raised) HP
+                State.Player.MoveSpeed *= 1f + save.MetaUpgradeBonus("speed");
             }
             SpawnPlayer(ps, character);
             // Looping per-map ambience (rain on storm maps, night wind otherwise).
@@ -284,6 +328,14 @@ namespace TheLastBullet.Core
             var flashlight = go.AddComponent<Flashlight>();
             flashlight.Setup(_map != null && _map.IsDark, SunLight);
             Player.Flashlight = flashlight;
+            // Drone companion (meta-shop purchase) orbits and auto-fires.
+            if (SaveSystem.Instance != null && SaveSystem.Instance.Profile.HasDroneCompanion)
+            {
+                var droneGo = new GameObject("Drone");
+                droneGo.transform.SetParent(go.transform, false);
+                var drone = droneGo.AddComponent<DroneCompanion>();
+                drone.Setup(SaveSystem.Instance.Profile.DroneLevel);
+            }
         }
 
         private void EnsureCameraRig()
@@ -375,6 +427,16 @@ namespace TheLastBullet.Core
             Kills++;
             KillStreak++;
             _streakTimer = KillStreakWindowSec;
+            // Per-kill progression: bestiary, boss/elite missions, weapon mastery.
+            if (SaveSystem.Instance != null)
+            {
+                if (z.IsBoss && z.BossKind.HasValue)
+                    SaveSystem.Instance.RecordBossKill(z.BossKind.Value);
+                else if (z.Kind.HasValue)
+                    SaveSystem.Instance.RecordKill(z.Kind.Value, z.IsElite);
+                if (Player != null)
+                    SaveSystem.Instance.AddWeaponMasteryXp(Player.WeaponId, 10);
+            }
             if (Juice != null) Juice.NoteKill(isCrit, KillStreak);
             GrantXp(z.IsBoss ? XpPerBossKill : XpPerKill);
             _lastKillPos = z.transform.position;
@@ -428,13 +490,6 @@ namespace TheLastBullet.Core
             _streakTimer = 0f;
             Juice.AddShake(0.4f);
             SynthAudio.Instance.Hit();
-            // Last stand: once per run, dropping to 25% HP triggers slow-mo
-            // plus a health pickup at the player's feet.
-            if (Player.Health > 0 && Player.IsLowHealth && !_lastStandTriggered)
-            {
-                _lastStandTriggered = true;
-                MapEvents.TriggerLastStand();
-            }
             if (Player.Health <= 0)
             {
                 // Second Wind super perk: once per run, revive at 50% HP.
@@ -469,7 +524,17 @@ namespace TheLastBullet.Core
             ps.Level = level;
             ps.Kills = Kills;
             ps.Headshots = Headshots;
-            if (leveled) PendingPerkChoices = RollPerkChoices();
+            if (leveled)
+            {
+                PendingPerkChoices = RollPerkChoices();
+                // Rare gold offer: a super perk (10% of level-ups, one at a time).
+                if (PendingSuperPerkOffer == null && SaveSystem.Instance != null &&
+                    Rng.NextDouble() < 0.10)
+                {
+                    var offer = SaveSystem.Instance.RollSuperPerkOffer();
+                    if (offer.Count > 0) PendingSuperPerkOffer = offer[0];
+                }
+            }
         }
 
         private List<PerkId> RollPerkChoices()
@@ -506,6 +571,19 @@ namespace TheLastBullet.Core
                     Player.Health = ps.Health;
                 }
             }
+            PendingPerkChoices = new List<PerkId>();
+            PendingSuperPerkOffer = null; // picking a normal perk dismisses the gold offer
+            SynthAudio.Instance.UiClick();
+            return true;
+        }
+
+        /// <summary>Take the gold super-perk offer (unlocks it permanently).</summary>
+        public bool ApplySuperPerk(string id)
+        {
+            if (PendingSuperPerkOffer == null || PendingSuperPerkOffer.Id != id) return false;
+            if (SaveSystem.Instance == null) return false;
+            if (!SaveSystem.Instance.UnlockSuperPerk(id)) return false;
+            PendingSuperPerkOffer = null;
             PendingPerkChoices = new List<PerkId>();
             SynthAudio.Instance.UiClick();
             return true;
@@ -623,6 +701,18 @@ namespace TheLastBullet.Core
             Bullets.Add(bullet);
         }
 
+        /// <summary>Player-side bullet (drone companion, turrets) — hits zombies, not the player.</summary>
+        public void SpawnPlayerBullet(Vector3 pos, float angleRad, float speed, float damage, float lifeSec)
+        {
+            var go = new GameObject("PlayerBullet");
+            go.layer = LayerMask.NameToLayer("Bullet");
+            go.transform.position = pos;
+            var bullet = go.AddComponent<Bullet>();
+            bullet.Launch(pos, AngleToDir(angleRad) * speed, damage, 0, true,
+                false, 0f, 0f, lifeSec, false);
+            Bullets.Add(bullet);
+        }
+
         // ---- buildables (port of the Kotlin shop actions) ----
 
         public bool BuyWeapon(WeaponId id)
@@ -678,6 +768,9 @@ namespace TheLastBullet.Core
         {
             float t = def.ReloadTimeSec * State.Player.ReloadMultiplier();
             if (State.Player.Mods.Contains(WeaponMod.FasterReload)) t *= 0.7f;
+            // Meta-shop reload upgrade: faster reloads.
+            if (SaveSystem.Instance != null)
+                t *= 1f - SaveSystem.Instance.MetaUpgradeBonus("reload");
             return t;
         }
 
@@ -823,6 +916,9 @@ namespace TheLastBullet.Core
         private void UpdatePickups(float dt)
         {
             float magnetRadius = 2.5f * State.Player.MagnetRadiusMultiplier();
+            // Meta-shop magnet upgrade: wider pickup radius.
+            if (SaveSystem.Instance != null)
+                magnetRadius *= 1f + SaveSystem.Instance.MetaUpgradeBonus("magnet");
             var collected = new List<Pickup>();
             foreach (var p in Pickups)
             {

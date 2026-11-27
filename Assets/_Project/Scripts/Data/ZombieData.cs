@@ -138,12 +138,14 @@ namespace TheLastBullet.Data
             public float CoinMultiplier { get; }
             public float EliteChanceBonus { get; }
             public float ZombieHealthMultiplier { get; }
+            public float ZombieCountMultiplier { get; }
 
             public DailyMutation(string name, string description, float speed = 1f,
-                float coins = 1f, float eliteBonus = 0f, float health = 1f)
+                float coins = 1f, float eliteBonus = 0f, float health = 1f, float count = 1f)
             {
                 Name = name; Description = description; ZombieSpeedMultiplier = speed;
                 CoinMultiplier = coins; EliteChanceBonus = eliteBonus; ZombieHealthMultiplier = health;
+                ZombieCountMultiplier = count;
             }
         }
 
@@ -153,7 +155,7 @@ namespace TheLastBullet.Data
             new DailyMutation("DoubleCoins", "All coin drops are doubled today.", coins: 2f),
             new DailyMutation("MoreElites", "Elite zombies appear far more often today.", eliteBonus: 0.10f),
             new DailyMutation("Tougher", "Zombies have 50% more health today.", health: 1.5f),
-            new DailyMutation("Swarm", "30% more zombies today, but each has 20% less health.", health: 0.8f),
+            new DailyMutation("Swarm", "30% more zombies today, but each has 20% less health.", health: 0.8f, count: 1.3f),
         };
 
         public static DailyMutation MutationForDay(int dayIndex)

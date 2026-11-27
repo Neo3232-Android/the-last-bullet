@@ -24,6 +24,8 @@ namespace TheLastBullet.UI
         private Text _gameOverText;
         private readonly List<Button> _perkButtons = new List<Button>();
         private readonly List<Text> _perkLabels = new List<Text>();
+        private Button _superPerkButton;
+        private Text _superPerkLabel;
         private bool _shown;
 
         public void Show() { _shown = true; if (_canvas != null) _canvas.gameObject.SetActive(true); }
@@ -211,7 +213,7 @@ namespace TheLastBullet.UI
             _perkPanel.transform.SetParent(parent, false);
             var rt = _perkPanel.AddComponent<RectTransform>();
             rt.anchorMin = new Vector2(0.5f, 0.5f); rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = Vector2.zero; rt.sizeDelta = new Vector2(640, 420);
+            rt.anchoredPosition = Vector2.zero; rt.sizeDelta = new Vector2(640, 540);
             var bg = _perkPanel.AddComponent<Image>();
             bg.color = new Color(0f, 0f, 0f, 0.8f);
             var title = MakeText(_perkPanel.transform, "LEVEL UP — pick a perk", new Vector2(0, 160),
@@ -231,6 +233,17 @@ namespace TheLastBullet.UI
                 var label = btn.GetComponentInChildren<Text>();
                 _perkLabels.Add(label);
             }
+            // Gold super-perk offer (rare level-up roll, shown only when present).
+            _superPerkButton = MakeButton(_perkPanel.transform, "", new Vector2(0, -210),
+                new Vector2(560, 80), () =>
+                {
+                    var gm = GameManager.Instance;
+                    if (gm != null && gm.PendingSuperPerkOffer != null)
+                        gm.ApplySuperPerk(gm.PendingSuperPerkOffer.Id);
+                });
+            var goldImg = _superPerkButton.GetComponent<Image>();
+            if (goldImg != null) goldImg.color = new Color(0.85f, 0.65f, 0.1f, 0.95f);
+            _superPerkLabel = _superPerkButton.GetComponentInChildren<Text>();
             _perkPanel.SetActive(false);
         }
 
@@ -251,10 +264,22 @@ namespace TheLastBullet.UI
                 {
                     var gm = GameManager.Instance;
                     if (gm == null) return;
-                    if (gm.CurrentLevel != null)
-                        gm.StartCampaignLevel(gm.CurrentLevel.Map, gm.CurrentLevel.Level);
-                    else
-                        gm.StartEndless(gm.State.MapId);
+                    // Retry the mode that was just played, not just Endless.
+                    switch (gm.State.Mode)
+                    {
+                        case GameMode.Timed: gm.StartTimed(gm.State.MapId); break;
+                        case GameMode.DefendPoint: gm.StartDefendPoint(gm.State.MapId); break;
+                        case GameMode.Escort: gm.StartEscort(gm.State.MapId); break;
+                        case GameMode.BossRush: gm.StartBossRush(gm.State.MapId); break;
+                        case GameMode.Hardcore: gm.StartHardcore(gm.State.MapId, gm.State.Level); break;
+                        case GameMode.DailyChallenge: gm.StartDailyChallenge(); break;
+                        default:
+                            if (gm.CurrentLevel != null)
+                                gm.StartCampaignLevel(gm.CurrentLevel.Map, gm.CurrentLevel.Level);
+                            else
+                                gm.StartEndless(gm.State.MapId);
+                            break;
+                    }
                 });
             MakeButton(_gameOverPanel.transform, "MENU", new Vector2(0, -210), new Vector2(220, 70),
                 () =>
@@ -309,8 +334,8 @@ namespace TheLastBullet.UI
                 _bossNameText.text = "";
             }
 
-            // Perk choices.
-            bool showPerks = gm.PendingPerkChoices.Count > 0;
+            // Perk choices (+ rare gold super-perk offer).
+            bool showPerks = gm.PendingPerkChoices.Count > 0 || gm.PendingSuperPerkOffer != null;
             _perkPanel.SetActive(showPerks);
             if (showPerks)
             {
@@ -324,6 +349,13 @@ namespace TheLastBullet.UI
                         var def = PerkData.Get(id);
                         _perkLabels[i].text = $"{def.Name}  (Lv {ps.PerkStacks(id) + 1})\n{def.Description}";
                     }
+                }
+                bool hasSuper = gm.PendingSuperPerkOffer != null;
+                if (_superPerkButton != null) _superPerkButton.gameObject.SetActive(hasSuper);
+                if (hasSuper && _superPerkLabel != null)
+                {
+                    var offer = gm.PendingSuperPerkOffer;
+                    _superPerkLabel.text = $"★ SUPER PERK: {offer.Name}\n{offer.Description}";
                 }
             }
 

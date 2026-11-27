@@ -84,7 +84,11 @@ namespace TheLastBullet.Core
             _queue.Clear();
             _spawnTimer = 0.5f;
 
-            var def = WaveBuilder.BuildWave(waveNumber, map, GameManager.Instance.Rng);
+            // Daily mutation: Swarm means 30% more zombies in every wave.
+            var gm = GameManager.Instance;
+            float countMult = gm != null && gm.TodayMutation != null
+                ? gm.TodayMutation.ZombieCountMultiplier : 1f;
+            var def = WaveBuilder.BuildWave(waveNumber, map, GameManager.Instance.Rng, countMult);
             if (def.IsBossWave)
             {
                 var boss = ZombieData.BossForLevel(MapData.IndexOf(map.Id), waveNumber / 5 - 1);
@@ -132,6 +136,10 @@ namespace TheLastBullet.Core
                     float eliteChance = _isEndless
                         ? ZombieData.EliteChanceForLevel(_endlessWave)
                         : _level.EliteChance;
+                    // Daily mutation: MoreElites raises the elite chance (cap 15%).
+                    if (gm.TodayMutation != null)
+                        eliteChance += gm.TodayMutation.EliteChanceBonus;
+                    eliteChance = Mathf.Min(eliteChance, 0.15f);
                     if (gm.Rng.NextDouble() < eliteChance) isElite = true;
                     gm.SpawnZombie(spawn.Kind.Value, spawn.Position, isElite, healthScale, speedScale);
                 }
