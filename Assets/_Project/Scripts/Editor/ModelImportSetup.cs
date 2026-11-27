@@ -56,12 +56,12 @@ namespace TheLastBullet.Editor
 
                         var importer = AssetImporter.GetAtPath(path) as ModelImporter;
                         if (importer == null) continue;
-                        if (importer.animationType == ModelImporterAnimationType.Humanoid) continue;
+                        if (importer.animationType == ModelImporterAnimationType.Human) continue;
 
-                        importer.animationType = ModelImporterAnimationType.Humanoid;
+                        importer.animationType = ModelImporterAnimationType.Human;
                         importer.SaveAndReimport();
                         fixedCount++;
-                        Debug.Log("[ModelImportSetup] Set Humanoid rig: " + path);
+                        Debug.Log("[ModelImportSetup] Set Human rig: " + path);
                     }
                     catch (Exception e)
                     {
