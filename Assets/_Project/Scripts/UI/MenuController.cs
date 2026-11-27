@@ -37,6 +37,15 @@ namespace TheLastBullet.UI
 
         private void Awake()
         {
+            // Safety net: the menu is dead without an EventSystem, so make
+            // sure one exists even if GameManager's Awake did not run first.
+            if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+            {
+                var es = new GameObject("EventSystem");
+                es.AddComponent<UnityEngine.EventSystems.EventSystem>();
+                es.AddComponent<UnityEngine.EventSystems.InputSystemUIInputModule>();
+                DontDestroyOnLoad(es);
+            }
             _hud = gameObject.AddComponent<HUDController>();
             Build();
             ShowMenu();
@@ -90,6 +99,18 @@ namespace TheLastBullet.UI
             scaler.referenceResolution = new Vector2(720, 1280);
             canvasGo.AddComponent<GraphicRaycaster>();
 
+            // Full-screen backdrop so the menu is not bare black. Added
+            // first so it sits behind everything; raycastTarget off so it
+            // never eats taps meant for the buttons.
+            var bgGo = new GameObject("Backdrop");
+            bgGo.transform.SetParent(canvasGo.transform, false);
+            var bgRt = bgGo.AddComponent<RectTransform>();
+            bgRt.anchorMin = Vector2.zero; bgRt.anchorMax = Vector2.one;
+            bgRt.offsetMin = Vector2.zero; bgRt.offsetMax = Vector2.zero;
+            var bg = bgGo.AddComponent<Image>();
+            bg.color = new Color(0.04f, 0.04f, 0.07f, 1f);
+            bg.raycastTarget = false;
+
             var title = MakeText(canvasGo.transform, "THE LAST BULLET", new Vector2(0, -40),
                 new Vector2(700, 70), TextAnchor.UpperCenter);
             title.fontSize = 52;
@@ -99,16 +120,17 @@ namespace TheLastBullet.UI
             _coinsText = MakeText(canvasGo.transform, "Coins: 0", new Vector2(0, -150),
                 new Vector2(700, 30), TextAnchor.UpperCenter);
 
-            _selectedMapText = MakeText(canvasGo.transform, "", new Vector2(0, -195),
+            _selectedMapText = MakeText(canvasGo.transform, "", new Vector2(0, -185),
                 new Vector2(700, 30), TextAnchor.UpperCenter);
 
-            // Map grid: 4 columns x 5 rows.
+            // Map grid: 4 columns x 5 rows. First row at -250 so it clears
+            // the map-info line above it (build 14: the two overlapped).
             for (int i = 0; i < MapData.All.Count; i++)
             {
                 var map = MapData.All[i];
                 int col = i % 4, row = i / 4;
                 var btn = MakeButton(canvasGo.transform, ShortName(map.Name),
-                    new Vector2(-255 + col * 170, -240 - row * 64), new Vector2(160, 54),
+                    new Vector2(-255 + col * 170, -250 - row * 64), new Vector2(160, 54),
                     () => { _selectedMap = map.Id; Refresh(); });
                 _mapButtons.Add(btn);
             }
@@ -152,19 +174,21 @@ namespace TheLastBullet.UI
             MakeButton(canvasGo.transform, "DAILY", new Vector2(235, -920), new Vector2(200, 50),
                 () => StartModeDaily());
 
-            // Character creator.
+            // Character creator. Two lines at a smaller size: the one-line
+            // version ran off the right edge of the screen (build 14).
             _creatorText = MakeText(canvasGo.transform, "", new Vector2(0, -985),
-                new Vector2(700, 30), TextAnchor.UpperCenter);
-            MakeButton(canvasGo.transform, "Skin", new Vector2(-240, -1035), new Vector2(140, 54),
+                new Vector2(700, 44), TextAnchor.UpperCenter);
+            _creatorText.fontSize = 18;
+            MakeButton(canvasGo.transform, "Skin", new Vector2(-240, -1040), new Vector2(140, 54),
                 () => Cycle(SkinTones, () => SaveSystem.Instance.Character.SkinTone,
                     v => SaveSystem.Instance.Character.SkinTone = v));
-            MakeButton(canvasGo.transform, "Hair", new Vector2(-80, -1035), new Vector2(140, 54),
+            MakeButton(canvasGo.transform, "Hair", new Vector2(-80, -1040), new Vector2(140, 54),
                 () => Cycle(HairColors, () => SaveSystem.Instance.Character.HairColor,
                     v => SaveSystem.Instance.Character.HairColor = v));
-            MakeButton(canvasGo.transform, "Outfit", new Vector2(80, -1035), new Vector2(140, 54),
+            MakeButton(canvasGo.transform, "Outfit", new Vector2(80, -1040), new Vector2(140, 54),
                 () => Cycle(OutfitColors, () => SaveSystem.Instance.Character.OutfitColor,
                     v => SaveSystem.Instance.Character.OutfitColor = v));
-            MakeButton(canvasGo.transform, "Style", new Vector2(240, -1035), new Vector2(140, 54),
+            MakeButton(canvasGo.transform, "Style", new Vector2(240, -1040), new Vector2(140, 54),
                 () =>
                 {
                     var c = SaveSystem.Instance.Character;
@@ -293,7 +317,7 @@ namespace TheLastBullet.UI
                 _levelButtons[i].interactable = lvl <= unlocked;
             }
             var c = save.Character;
-            _creatorText.text = $"You: skin {c.SkinTone}  hair {c.HairStyle} {c.HairColor}  outfit {c.OutfitColor}  " +
+            _creatorText.text = $"You: skin {c.SkinTone}  hair {c.HairStyle} {c.HairColor}  outfit {c.OutfitColor}\n" +
                 $"weapon {c.StartingWeaponId}  perk {c.StartingPerkId}";
             _settingsText.text = $"Quality: {save.QualitySetting}    Sound: " +
                 (Audio.SynthAudio.Instance != null && Audio.SynthAudio.Instance.Muted ? "Muted" : "On");
@@ -337,6 +361,10 @@ namespace TheLastBullet.UI
             tmp.fontSize = 24;
             tmp.color = Color.white;
             tmp.alignment = align;
+            // Labels never eat taps: only buttons are raycast targets, so a
+            // text that overlaps a button (e.g. the map-info line over the
+            // grid in build 14) can never block that button.
+            tmp.raycastTarget = false;
             return tmp;
         }
 
@@ -363,6 +391,7 @@ namespace TheLastBullet.UI
             tmp.fontSize = 20;
             tmp.color = new Color(1f, 0.84f, 0f);
             tmp.alignment = TextAnchor.MiddleCenter;
+            tmp.raycastTarget = false;
             return btn;
         }
     }

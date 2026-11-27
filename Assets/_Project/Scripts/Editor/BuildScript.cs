@@ -57,6 +57,11 @@ namespace TheLastBullet.Editor
             PlayerSettings.Android.bundleVersionCode = 1;
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             PlayerSettings.allowedAutorotateToPortrait = true;
+            // Both input handlers: the UI uses the new Input System
+            // (InputSystemUIInputModule on the EventSystem) while the
+            // twin-stick controls read the old Input Manager (Input.touches).
+            // "Both" keeps both alive; either one alone kills the other.
+            PlayerSettings.activeInputHandler = InputHandler.Both;
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
             PlayerSettings.allowedAutorotateToLandscapeLeft = false;
             PlayerSettings.allowedAutorotateToLandscapeRight = false;

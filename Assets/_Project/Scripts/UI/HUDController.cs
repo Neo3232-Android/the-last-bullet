@@ -177,6 +177,8 @@ namespace TheLastBullet.UI
             tmp.fontSize = 24;
             tmp.color = Color.white;
             tmp.alignment = align;
+            // Labels never eat taps: only buttons are raycast targets.
+            tmp.raycastTarget = false;
             return tmp;
         }
 
@@ -204,6 +206,7 @@ namespace TheLastBullet.UI
             tmp.fontSize = 20;
             tmp.color = new Color(1f, 0.84f, 0f);
             tmp.alignment = TextAnchor.MiddleCenter;
+            tmp.raycastTarget = false;
             return btn;
         }
 

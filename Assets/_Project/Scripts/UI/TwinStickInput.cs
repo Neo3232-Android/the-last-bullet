@@ -83,7 +83,11 @@ namespace TheLastBullet.UI
             if (!playing)
             {
                 MoveInput = Vector2.zero; AimInput = Vector2.zero; Firing = false;
+                // Hide ALL stick visuals in the menu — the bases were hidden
+                // here but the knobs were not, so an orange knob sat in the
+                // bottom-left corner of the menu (build 14 screenshot).
                 SetVisible(_moveBase, false); SetVisible(_aimBase, false);
+                SetVisible(_moveKnob, false); SetVisible(_aimKnob, false);
                 _moveFingerId = _aimFingerId = -1;
                 return;
             }

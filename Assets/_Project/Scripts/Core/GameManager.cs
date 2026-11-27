@@ -375,11 +375,18 @@ namespace TheLastBullet.Core
                 if (SunLight == null) SunLight = FindFirstObjectByType<Light>();
             }
             // EventSystem for UI input (created once, persists).
+            // Use InputSystemUIInputModule, NOT StandaloneInputModule: the
+            // Input System package is installed, and with it active the old
+            // StandaloneInputModule receives no touch input, so every menu
+            // button is dead (the menu renders but taps do nothing — the
+            // "frozen menu" bug Mohammed hit in build 14). The old Input
+            // Manager stays alive for the twin-stick controls because
+            // BuildScript sets activeInputHandler to Both.
             if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
             {
                 var es = new GameObject("EventSystem");
                 es.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                es.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+                es.AddComponent<UnityEngine.EventSystems.InputSystemUIInputModule>();
                 DontDestroyOnLoad(es);
             }
         }
