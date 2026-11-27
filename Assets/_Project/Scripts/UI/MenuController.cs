@@ -20,6 +20,9 @@ namespace TheLastBullet.UI
         private Text _selectedMapText;
         private Text _creatorText;
         private Text _settingsText;
+        private Text _modeText;
+        private Text _progressionText;
+        private string _loginRewardNote = "";
         private readonly List<Button> _mapButtons = new List<Button>();
         private readonly List<Button> _levelButtons = new List<Button>();
         private MapId _selectedMap = MapId.CityStreet;
@@ -45,6 +48,17 @@ namespace TheLastBullet.UI
             if (gm != null) gm.State.Phase = GamePhase.Menu;
             if (_canvas != null) _canvas.gameObject.SetActive(true);
             if (_hud != null) _hud.Hide();
+            // Daily housekeeping: fresh missions when the day turns over, and
+            // today's login reward if it has not been claimed yet.
+            var save = SaveSystem.Instance;
+            if (save != null)
+            {
+                save.RollMissionsIfNeeded();
+                var reward = save.GrantLoginRewardIfDue();
+                _loginRewardNote = reward != null
+                    ? $"Login reward: +{save.LastLoginRewardGrantedCoins} coins (Day {save.Profile.LoginStreakDays} streak)!  "
+                    : "";
+            }
             Refresh();
         }
 
@@ -118,19 +132,39 @@ namespace TheLastBullet.UI
                     HideMenu();
                 });
 
+            // Modes (build 2): each starts through the LevelDirector, which
+            // self-bootstraps the run. Parent may switch these to the thin
+            // GameManager wrappers (StartTimed etc.) — same behaviour.
+            _modeText = MakeText(canvasGo.transform, "MODES", new Vector2(0, -815),
+                new Vector2(700, 26), TextAnchor.UpperCenter);
+            _modeText.fontSize = 20;
+            _modeText.color = new Color(1f, 0.84f, 0f);
+            MakeButton(canvasGo.transform, "TIMED 5:00", new Vector2(-235, -860), new Vector2(200, 50),
+                () => StartModeTimed());
+            MakeButton(canvasGo.transform, "DEFEND", new Vector2(0, -860), new Vector2(200, 50),
+                () => StartModeDefend());
+            MakeButton(canvasGo.transform, "ESCORT", new Vector2(235, -860), new Vector2(200, 50),
+                () => StartModeEscort());
+            MakeButton(canvasGo.transform, "BOSS RUSH", new Vector2(-235, -920), new Vector2(200, 50),
+                () => StartModeBossRush());
+            MakeButton(canvasGo.transform, "HARDCORE", new Vector2(0, -920), new Vector2(200, 50),
+                () => StartModeHardcore());
+            MakeButton(canvasGo.transform, "DAILY", new Vector2(235, -920), new Vector2(200, 50),
+                () => StartModeDaily());
+
             // Character creator.
-            _creatorText = MakeText(canvasGo.transform, "", new Vector2(0, -850),
+            _creatorText = MakeText(canvasGo.transform, "", new Vector2(0, -985),
                 new Vector2(700, 30), TextAnchor.UpperCenter);
-            MakeButton(canvasGo.transform, "Skin", new Vector2(-240, -900), new Vector2(140, 54),
+            MakeButton(canvasGo.transform, "Skin", new Vector2(-240, -1035), new Vector2(140, 54),
                 () => Cycle(SkinTones, () => SaveSystem.Instance.Character.SkinTone,
                     v => SaveSystem.Instance.Character.SkinTone = v));
-            MakeButton(canvasGo.transform, "Hair", new Vector2(-80, -900), new Vector2(140, 54),
+            MakeButton(canvasGo.transform, "Hair", new Vector2(-80, -1035), new Vector2(140, 54),
                 () => Cycle(HairColors, () => SaveSystem.Instance.Character.HairColor,
                     v => SaveSystem.Instance.Character.HairColor = v));
-            MakeButton(canvasGo.transform, "Outfit", new Vector2(80, -900), new Vector2(140, 54),
+            MakeButton(canvasGo.transform, "Outfit", new Vector2(80, -1035), new Vector2(140, 54),
                 () => Cycle(OutfitColors, () => SaveSystem.Instance.Character.OutfitColor,
                     v => SaveSystem.Instance.Character.OutfitColor = v));
-            MakeButton(canvasGo.transform, "Style", new Vector2(240, -900), new Vector2(140, 54),
+            MakeButton(canvasGo.transform, "Style", new Vector2(240, -1035), new Vector2(140, 54),
                 () =>
                 {
                     var c = SaveSystem.Instance.Character;
@@ -140,9 +174,9 @@ namespace TheLastBullet.UI
                 });
 
             // Settings.
-            _settingsText = MakeText(canvasGo.transform, "", new Vector2(0, -970),
+            _settingsText = MakeText(canvasGo.transform, "", new Vector2(0, -1100),
                 new Vector2(700, 30), TextAnchor.UpperCenter);
-            MakeButton(canvasGo.transform, "Quality", new Vector2(-90, -1020), new Vector2(160, 54),
+            MakeButton(canvasGo.transform, "Quality", new Vector2(-90, -1150), new Vector2(160, 54),
                 () =>
                 {
                     var save = SaveSystem.Instance;
@@ -151,13 +185,18 @@ namespace TheLastBullet.UI
                     save.Save();
                     Refresh();
                 });
-            MakeButton(canvasGo.transform, "Mute", new Vector2(90, -1020), new Vector2(160, 54),
+            MakeButton(canvasGo.transform, "Mute", new Vector2(90, -1150), new Vector2(160, 54),
                 () =>
                 {
                     var audio = Audio.SynthAudio.Instance;
                     if (audio != null) audio.Muted = !audio.Muted;
                     Refresh();
                 });
+
+            // Progression panel (text only): streak, bestiary, drone, today's missions.
+            _progressionText = MakeText(canvasGo.transform, "", new Vector2(0, -1210),
+                new Vector2(700, 60), TextAnchor.UpperCenter);
+            _progressionText.fontSize = 18;
         }
 
         private void Cycle(string[] options, System.Func<string> get, System.Action<string> apply)
@@ -174,6 +213,63 @@ namespace TheLastBullet.UI
             var profile = SaveSystem.Instance.Profile;
             if (level > profile.UnlockedLevel(map)) return; // locked
             GameManager.Instance.StartCampaignLevel(map, level);
+            HideMenu();
+        }
+
+        private LevelDirector ModeDirector()
+        {
+            var gm = GameManager.Instance;
+            return gm != null ? gm.LevelDirector : null;
+        }
+
+        private void StartModeTimed()
+        {
+            var ld = ModeDirector();
+            if (ld == null) return;
+            ld.StartTimed(MapData.Get(_selectedMap), LevelDirector.DefaultTimedSeconds);
+            HideMenu();
+        }
+
+        private void StartModeDefend()
+        {
+            var ld = ModeDirector();
+            if (ld == null) return;
+            ld.StartDefendPoint(MapData.Get(_selectedMap));
+            HideMenu();
+        }
+
+        private void StartModeEscort()
+        {
+            var ld = ModeDirector();
+            if (ld == null) return;
+            ld.StartEscort(MapData.Get(_selectedMap));
+            HideMenu();
+        }
+
+        private void StartModeBossRush()
+        {
+            var ld = ModeDirector();
+            if (ld == null) return;
+            ld.StartBossRush(MapData.Get(_selectedMap));
+            HideMenu();
+        }
+
+        private void StartModeHardcore()
+        {
+            var ld = ModeDirector();
+            if (ld == null) return;
+            // Hardcore runs the hardest level unlocked on the selected map.
+            int level = Mathf.Clamp(SaveSystem.Instance.Profile.UnlockedLevel(_selectedMap),
+                1, LevelData.LevelsPerMap);
+            ld.StartHardcore(MapData.Get(_selectedMap), level);
+            HideMenu();
+        }
+
+        private void StartModeDaily()
+        {
+            var ld = ModeDirector();
+            if (ld == null) return;
+            ld.StartDailyChallenge();
             HideMenu();
         }
 
@@ -201,6 +297,25 @@ namespace TheLastBullet.UI
                 $"weapon {c.StartingWeaponId}  perk {c.StartingPerkId}";
             _settingsText.text = $"Quality: {save.QualitySetting}    Sound: " +
                 (Audio.SynthAudio.Instance != null && Audio.SynthAudio.Instance.Muted ? "Muted" : "On");
+            var dailyMap = LevelDirector.TodayDailyMap();
+            var mutation = LevelDirector.TodayDailyMutation();
+            _modeText.text = "MODES  —  Today: " + dailyMap.Name +
+                (mutation != null ? " (" + mutation.Name + ": " + mutation.Description + ")" : "");
+            string missionText = "";
+            var missions = save.TodaysDailyMissions();
+            for (int i = 0; i < missions.Count; i++)
+            {
+                var m = missions[i];
+                int p = profile.DailyMissionProgress.TryGetValue(m.Id, out int v) ? v : 0;
+                bool done = profile.CompletedDailyMissions.Contains(m.Id);
+                if (i > 0) missionText += "  •  ";
+                missionText += m.Description + " (" + System.Math.Min(p, m.Target) + "/" + m.Target + ")" +
+                    (done ? " DONE" : "");
+            }
+            _progressionText.text = _loginRewardNote +
+                $"Streak: {profile.LoginStreakDays}d  •  Bestiary: {profile.BestiaryTotalCompletedCount()}/{PlayerProfile.BestiaryTotalCount()}  •  " +
+                $"Drone: {(profile.HasDroneCompanion ? "Lv" + profile.DroneLevel : "No")}  •  Daily streak: {profile.DailyChallengeStreak}\n" +
+                missionText;
         }
 
         private static string ShortName(string name) =>

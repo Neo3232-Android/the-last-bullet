@@ -164,6 +164,12 @@ namespace TheLastBullet.Gameplay
             if (gm.IsInstaKillActive) amount = float.MaxValue;
 
             Vector3 hitDir = (target.transform.position - transform.position).normalized;
+            if (gm.Juice != null)
+            {
+                gm.Juice.SpawnBloodHit(target.transform.position + Vector3.up * 1.0f);
+                gm.Juice.SpawnDamageNumber(target.transform.position + Vector3.up * 1.2f,
+                    Mathf.RoundToInt(amount), crit);
+            }
             gm.DamageZombie(target, amount, crit, hitDir);
             if (!target.IsAlive) return;
 

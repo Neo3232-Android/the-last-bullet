@@ -35,6 +35,7 @@ namespace TheLastBullet.Core
         public LevelDirector LevelDirector { get; private set; }
         public PlayerController Player { get; private set; }
         public Camera MainCamera { get; private set; }
+        public Light SunLight { get; private set; }
         public JuiceController Juice { get; private set; }
         public System.Random Rng { get; private set; } = new System.Random();
 
@@ -68,6 +69,7 @@ namespace TheLastBullet.Core
         private float _fpsEstimate = 60f;
         private bool _paused;
         private bool _secondWindUsed;
+        private bool _lastStandTriggered;
         private MapDef _map;
         private Vector3 _lastKillPos;
         private bool _hasLastKillPos;
@@ -84,6 +86,11 @@ namespace TheLastBullet.Core
             Instance = this;
             DontDestroyOnLoad(gameObject);
             LevelDirector = gameObject.AddComponent<LevelDirector>();
+            // RecordedAudio sits next to SynthAudio: SynthAudio tries the
+            // recorded sounds first and falls back to synth when a file is
+            // missing, so no call site needs to change.
+            if (gameObject.GetComponent<RecordedAudio>() == null)
+                gameObject.AddComponent<RecordedAudio>();
             EnsureCameraRig();
             QualitySettingsApplier.Apply(
                 SaveSystem.Instance != null ? SaveSystem.Instance.QualitySetting : Quality.High);
@@ -213,6 +220,7 @@ namespace TheLastBullet.Core
             TodayMutation = ZombieData.MutationForDay(
                 (int)(DateTime.UtcNow.Date - new DateTime(2026, 1, 1)).TotalDays);
             _secondWindUsed = false; _hasLastKillPos = false;
+            _lastStandTriggered = false;
 
             var profile = SaveSystem.Instance != null ? SaveSystem.Instance.Profile : new PlayerProfile();
             var character = SaveSystem.Instance != null ? SaveSystem.Instance.Character : CharacterDef.Default();
@@ -240,6 +248,8 @@ namespace TheLastBullet.Core
                 State.Player.DamageBonus = profile.PrestigeDamageBonus() - 1f;
             }
             SpawnPlayer(ps, character);
+            // Looping per-map ambience (rain on storm maps, night wind otherwise).
+            SynthAudio.Instance.StartAmbience(_map != null ? _map.Hazard : "night");
         }
 
         private void ClearEntities()
@@ -270,6 +280,10 @@ namespace TheLastBullet.Core
             go.transform.position = Vector3.zero;
             Player = go.AddComponent<PlayerController>();
             Player.Setup(ps, character);
+            // Flashlight on dark maps (spotlight aimed by the aim stick).
+            var flashlight = go.AddComponent<Flashlight>();
+            flashlight.Setup(_map != null && _map.IsDark, SunLight);
+            Player.Flashlight = flashlight;
         }
 
         private void EnsureCameraRig()
@@ -296,6 +310,17 @@ namespace TheLastBullet.Core
                 light.type = LightType.Directional;
                 light.intensity = 1.1f;
                 light.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+                SunLight = light;
+            }
+            else
+            {
+                // The sun is the scene's directional light, if one exists.
+                var lights = UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None);
+                foreach (var l in lights)
+                {
+                    if (l != null && l.type == LightType.Directional) { SunLight = l; break; }
+                }
+                if (SunLight == null) SunLight = FindFirstObjectByType<Light>();
             }
             // EventSystem for UI input (created once, persists).
             if (FindFirstObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
@@ -338,7 +363,7 @@ namespace TheLastBullet.Core
 
         private void KillZombie(ZombieAI z, bool isCrit, Vector3 hitDir)
         {
-            z.BeginDeath();
+            z.BeginDeath(z.transform.position + Vector3.up * 1.0f, hitDir);
             int scoreValue = z.IsBoss
                 ? ZombieData.GetBoss(z.BossKind.Value).ScoreValue
                 : ZombieData.Get(z.Kind.Value).ScoreValue;
@@ -350,6 +375,7 @@ namespace TheLastBullet.Core
             Kills++;
             KillStreak++;
             _streakTimer = KillStreakWindowSec;
+            if (Juice != null) Juice.NoteKill(isCrit, KillStreak);
             GrantXp(z.IsBoss ? XpPerBossKill : XpPerKill);
             _lastKillPos = z.transform.position;
             _hasLastKillPos = true;
@@ -357,8 +383,7 @@ namespace TheLastBullet.Core
             Juice.SpawnGoo(z.transform.position, z.IsBoss ? 24 : 8);
             if (z.IsBoss)
             {
-                TriggerSlowMo(1.2f);
-                Juice.AddShake(1f);
+                Juice.BossKillSlowMo();
                 SynthAudio.Instance.BossDie();
             }
             else
@@ -403,6 +428,13 @@ namespace TheLastBullet.Core
             _streakTimer = 0f;
             Juice.AddShake(0.4f);
             SynthAudio.Instance.Hit();
+            // Last stand: once per run, dropping to 25% HP triggers slow-mo
+            // plus a health pickup at the player's feet.
+            if (Player.Health > 0 && Player.IsLowHealth && !_lastStandTriggered)
+            {
+                _lastStandTriggered = true;
+                MapEvents.TriggerLastStand();
+            }
             if (Player.Health <= 0)
             {
                 // Second Wind super perk: once per run, revive at 50% HP.
@@ -530,6 +562,9 @@ namespace TheLastBullet.Core
             go.transform.position = pos;
             var zombie = go.AddComponent<ZombieAI>();
             zombie.Setup(kind, def, healthScale, speedScale, isElite);
+            // Stage 2: swap the placeholder for the real FBX model.
+            var zombieModel = ModelLibrary.InstantiateZombieModel(kind);
+            if (zombieModel != null) zombie.SetModel(zombieModel, ModelLibrary.ScaleFor(kind));
             Zombies.Add(zombie);
         }
 
@@ -541,6 +576,9 @@ namespace TheLastBullet.Core
             go.transform.position = pos;
             var zombie = go.AddComponent<ZombieAI>();
             zombie.Setup(kind, def, healthScale);
+            // Stage 2: swap the placeholder for the real FBX boss model.
+            var bossModel = ModelLibrary.InstantiateBossModel(kind);
+            if (bossModel != null) zombie.SetModel(bossModel, ModelLibrary.ScaleFor(kind));
             zombie.BossIntroTimer = 2f; // roars for 2s, cannot be damaged yet, camera punches in
             if (Juice != null) Juice.ZoomPunch = 1f;
             Zombies.Add(zombie);
@@ -881,7 +919,11 @@ namespace TheLastBullet.Core
             State.Player.Coins = RunCoins;
             State.Player.Kills = Kills;
             State.Player.Headshots = Headshots;
-            SynthAudio.Instance.GameOver();
+            // Win = victory fanfare, loss = defeat sting (GameOver maps to
+            // the recorded defeat sting); the run ambience stops either way.
+            if (Won) SynthAudio.Instance.LevelComplete();
+            else SynthAudio.Instance.GameOver();
+            SynthAudio.Instance.StopAmbience();
             LevelDirector.OnRunEnded(Won);
         }
     }

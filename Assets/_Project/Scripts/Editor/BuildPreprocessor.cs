@@ -18,6 +18,7 @@ namespace TheLastBullet.Editor
         public void OnPreprocessBuild(BuildReport report)
         {
             BuildScript.ApplyPlayerSettings();
+            ModelImportSetup.EnsureHumanoidRigs();
             SetupURP.EnsureURPAsset(refresh: false);
             SetupURP.EnsureAlwaysIncludedShaders();
         }

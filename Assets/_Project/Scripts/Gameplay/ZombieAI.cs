@@ -57,6 +57,7 @@ namespace TheLastBullet.Gameplay
         private float _screamCooldown;
         private float _summonCooldown;
         private float _spitCooldown;
+        private float _groanTimer;
         private float _chargeTimer;
         private float _chargeCooldown;
         private bool _isCharging;
@@ -64,10 +65,29 @@ namespace TheLastBullet.Gameplay
         private Vector3 _chargeVel;
         private Rigidbody _rb;
         private Animator _animator;
+        private ModelAnimator _modelAnimator;
         private RagdollController _ragdoll;
         private GameObject _placeholderModel;
         private Renderer[] _placeholderRenderers;
         private float _spawnRiseFromY;
+
+        // ---- layered-death timeline (driven by Update, not FixedUpdate:
+        // FixedUpdate early-returns while Falling) ----
+        private Vector3 _deathHitDir;
+        private bool _deathImpactDone;
+        private bool _deathFadeStarted;
+        private bool _wasFrozen;
+        private bool _wasBurning;
+        private float _deathSinkRate = 0.45f;
+        private float _deathImpactDelay = 0.35f;
+
+        // ---- spawn-variant one-shots ----
+        private bool _spawnBurstDone;
+        private bool _spawnLanded;
+
+        // ---- boss-intro pulse ----
+        private float _bossIntroDuration;
+        private bool _bossIntroJuiceDone;
 
         public void Setup(ZombieKind kind, ZombieDef def, float healthScale, float speedScale, bool isElite)
         {
@@ -93,6 +113,7 @@ namespace TheLastBullet.Gameplay
             Damage = damage;
             Radius = radius;
             IsElite = isElite;
+            _groanTimer = 1f + (float)new System.Random().NextDouble() * 3f; // stagger groans
             if (isElite)
             {
                 Health *= ZombieData.EliteHealthMultiplier;
@@ -127,6 +148,7 @@ namespace TheLastBullet.Gameplay
             modelRoot.transform.localPosition = Vector3.zero;
             modelRoot.transform.localScale = Vector3.one * scale;
             _animator = modelRoot.GetComponentInChildren<Animator>();
+            _modelAnimator = modelRoot.GetComponentInChildren<ModelAnimator>();
             _ragdoll = modelRoot.GetComponentInChildren<RagdollController>();
         }
 
@@ -208,24 +230,164 @@ namespace TheLastBullet.Gameplay
                 Destroy(c);
         }
 
+        /// <summary>
+        /// Layered death — a sequence, never just the raw Death clip:
+        /// (a) hit-stop + goo burst at the hit point, (b) collapse (ragdoll
+        /// with the killing-blow direction, or tip-over for placeholders),
+        /// (c) ground impact (dust + thump, driven by Update), (d) fade + sink
+        /// over ~1.5s (GameManager destroys the corpse at 4s).
+        /// Frozen zombies shatter (ice shards, instant collapse, no ragdoll);
+        /// burning zombies leave a brief fire patch; bosses get a big explosion
+        /// (slow-mo + boss sting already fire from GameManager.KillZombie
+        /// right after this call — deliberately not duplicated here).
+        /// </summary>
         public void BeginDeath()
+        {
+            BeginDeath(transform.position + Vector3.up * 1.0f, Vector3.zero);
+        }
+
+        /// <summary>Same sequence with the real hit point / killing-blow direction.</summary>
+        public void BeginDeath(Vector3 hitPoint, Vector3 hitDir)
         {
             if (DeathState != DeathState.None) return;
             DeathState = DeathState.Falling;
-            DeathTime = GameManager.Instance.SimTime;
+            var gm = GameManager.Instance;
+            if (gm == null) return;
+            DeathTime = gm.SimTime;
             AttackState = AttackState.None;
             _rb.velocity = Vector3.zero;
-            if (_ragdoll != null)
+            _deathHitDir = hitDir;
+            _wasFrozen = gm.SimTime < FrozenUntil;
+            _wasBurning = gm.SimTime < BurnUntil;
+            _deathImpactDelay = _wasFrozen ? 0.05f : 0.35f;
+            _deathSinkRate = _wasFrozen ? 1.2f : (IsBoss ? 0.3f : 0.45f);
+
+            // Play the model's Death clip (legacy Animation) — layered under
+            // the ragdoll/tip-over collapse below.
+            if (_modelAnimator != null) _modelAnimator.PlayDeath();
+
+            var juice = gm.Juice;
+
+            // (a) Hit-stop + goo burst at the hit point.
+            if (juice != null)
             {
-                Vector3 dir = Vector3.zero;
-                var player = GameManager.Instance.Player;
-                if (player != null)
-                    dir = (transform.position - player.transform.position).normalized;
+                juice.AddHitStop(IsBoss ? 0.08f : 0.03f);
+                juice.SpawnGoo(hitPoint, IsBoss ? 24 : 8);
+            }
+
+            // (b) Collapse.
+            if (_wasFrozen)
+            {
+                // Shatter: ice shards, instant stiff collapse, no ragdoll fall.
+                if (juice != null)
+                    juice.SpawnShatter(transform.position + Vector3.up * 0.9f, IsBoss ? 20 : 12);
+                CollapseStiff();
+            }
+            else if (_ragdoll != null)
+            {
+                Vector3 dir = _deathHitDir;
+                if (dir.sqrMagnitude < 0.001f && gm.Player != null)
+                    dir = (transform.position - gm.Player.transform.position).normalized;
                 _ragdoll.EnableRagdoll(dir);
             }
             else if (_placeholderModel != null)
             {
                 _placeholderModel.transform.Rotate(-90f, 0f, 0f); // fall over
+            }
+
+            // Burning zombies leave a brief fire patch.
+            if (_wasBurning && juice != null)
+                juice.SpawnExplosion(transform.position + Vector3.up * 0.3f, 6);
+
+            // Boss death: bigger explosion on top of the sequence.
+            if (IsBoss && juice != null)
+            {
+                juice.SpawnExplosion(transform.position + Vector3.up, 24);
+                juice.AddShake(0.8f);
+            }
+        }
+
+        /// <summary>Stiff tip-over used for frozen shatters (no ragdoll).</summary>
+        private void CollapseStiff()
+        {
+            if (_placeholderModel != null)
+                _placeholderModel.transform.Rotate(-90f, 0f, 0f);
+            else
+                transform.Rotate(-90f, 0f, 0f);
+        }
+
+        /// <summary>
+        /// Death timeline only — movement/AI stays in FixedUpdate (which
+        /// early-returns while Falling). Drives the ground-impact moment and
+        /// the fade + sink; GameManager destroys the corpse at DeathTime + 4s.
+        /// </summary>
+        private void Update()
+        {
+            if (DeathState != DeathState.Falling) return;
+            var gm = GameManager.Instance;
+            if (gm == null) return;
+            float t = gm.SimTime - DeathTime;
+
+            // (c) Ground-impact moment: dust + thump scaled by size.
+            if (!_deathImpactDone && t >= _deathImpactDelay)
+            {
+                _deathImpactDone = true;
+                float sizeScale = IsBoss ? 2.2f : (IsElite ? 1.4f : 1f);
+                if (gm.Juice != null)
+                {
+                    gm.Juice.SpawnDust(transform.position + Vector3.up * 0.2f, IsBoss ? 14 : 6);
+                    gm.Juice.AddShake(0.12f * sizeScale);
+                    if (_wasBurning)
+                        gm.Juice.SpawnExplosion(transform.position + Vector3.up * 0.3f, 5);
+                }
+            }
+
+            // (d) Fade + sink from ~0.6s over ~1.5s.
+            if (t >= 0.6f)
+            {
+                float fadeT = Mathf.Clamp01((t - 0.6f) / 1.5f);
+                if (!_deathFadeStarted)
+                {
+                    _deathFadeStarted = true;
+                    MakePlaceholderTransparent();
+                }
+                FadePlaceholder(1f - fadeT);
+                Vector3 p = transform.position;
+                p.y -= _deathSinkRate * Time.deltaTime;
+                transform.position = p;
+            }
+        }
+
+        /// <summary>Switch placeholder materials to transparent so FadePlaceholder is visible.</summary>
+        private void MakePlaceholderTransparent()
+        {
+            if (_placeholderRenderers == null) return;
+            foreach (var r in _placeholderRenderers)
+            {
+                if (r == null) continue;
+                var mat = r.material;
+                if (mat == null) continue;
+                mat.SetFloat("_Surface", 1f);
+                mat.SetFloat("_Blend", 0f);
+                mat.SetFloat("_AlphaClip", 0f);
+                mat.SetFloat("_SrcBlend", 1f);
+                mat.SetFloat("_DstBlend", 10f);
+                mat.SetFloat("_ZWrite", 0f);
+                mat.renderQueue = 3000;
+            }
+        }
+
+        private void FadePlaceholder(float alpha)
+        {
+            if (_placeholderRenderers == null) return;
+            foreach (var r in _placeholderRenderers)
+            {
+                if (r == null) continue;
+                var mat = r.material;
+                if (mat == null) continue;
+                var c = mat.color;
+                c.a = alpha;
+                mat.color = c;
             }
         }
 
@@ -240,19 +402,62 @@ namespace TheLastBullet.Gameplay
             if (DeathState == DeathState.Falling) return;
 
             // Spawning: rise out of the ground, can't act yet.
+            // Each variant reads differently: RiseFromGround surfaces with a
+            // dirt burst, BurstManhole pops up fast with a ring burst,
+            // DropFromAbove slams down with dust + shake on landing.
             if (SpawnProgress < 1f)
             {
-                SpawnProgress = Mathf.Min(1f, SpawnProgress + dt / GameManager.SpawnRiseSec);
+                float riseSec = SpawnVariant == SpawnVariant.BurstManhole
+                    ? GameManager.SpawnRiseSec * 0.4f // fast pop-up
+                    : GameManager.SpawnRiseSec;
+                SpawnProgress = Mathf.Min(1f, SpawnProgress + dt / riseSec);
                 Vector3 p = transform.position;
                 p.y = Mathf.Lerp(_spawnRiseFromY, 0f, SpawnProgress);
                 transform.position = p;
+
+                var juice = gm.Juice;
+                Vector3 groundPos = new Vector3(transform.position.x, 0.2f, transform.position.z);
+                if (SpawnVariant == SpawnVariant.RiseFromGround &&
+                    !_spawnBurstDone && SpawnProgress >= 0.85f)
+                {
+                    _spawnBurstDone = true; // dirt burst as it surfaces
+                    if (juice != null) juice.SpawnDust(groundPos, 8);
+                }
+                else if (SpawnVariant == SpawnVariant.BurstManhole &&
+                    !_spawnBurstDone && SpawnProgress > 0f)
+                {
+                    _spawnBurstDone = true; // ring burst on the fast pop-up
+                    if (juice != null) juice.SpawnDust(groundPos, 12);
+                }
+                if (SpawnProgress >= 1f && !_spawnLanded)
+                {
+                    _spawnLanded = true;
+                    if (SpawnVariant == SpawnVariant.DropFromAbove && juice != null)
+                    {
+                        juice.SpawnDust(groundPos, 14);
+                        juice.AddShake(0.25f);
+                    }
+                }
                 return;
             }
 
-            // Boss intro: roaring, can't move or attack yet.
+            // Boss intro: roaring, can't move or attack yet. The boss visibly
+            // arrives — camera punch + shake on the first frame, then a scale
+            // pulse growing 0.8x -> full over the 2s roar.
             if (BossIntroTimer > 0f)
             {
+                if (_bossIntroDuration <= 0f)
+                {
+                    _bossIntroDuration = BossIntroTimer;
+                    if (!_bossIntroJuiceDone)
+                    {
+                        _bossIntroJuiceDone = true;
+                        if (gm.Juice != null) gm.Juice.BossIntro(transform.position, BossKind);
+                    }
+                }
                 BossIntroTimer -= dt;
+                float introT = 1f - Mathf.Clamp01(BossIntroTimer / _bossIntroDuration);
+                transform.localScale = Vector3.one * Mathf.Lerp(0.8f, 1f, introT);
                 var player = gm.Player;
                 if (player != null)
                 {
@@ -279,6 +484,18 @@ namespace TheLastBullet.Gameplay
             _spitCooldown = Mathf.Max(0f, _spitCooldown - dt);
             _chargeCooldown = Mathf.Max(0f, _chargeCooldown - dt);
             if (simTime > SlowUntil) SlowFactor = 1f;
+
+            // Occasional groan — only when close enough to the player to be
+            // heard, so a full horde doesn't become a wall of noise.
+            _groanTimer -= dt;
+            if (_groanTimer <= 0f)
+            {
+                _groanTimer = 3f + (float)new System.Random().NextDouble() * 4f;
+                var p = gm.Player;
+                if (p != null && Kind.HasValue &&
+                    Vector3.Distance(transform.position, p.transform.position) < 25f)
+                    Audio.SynthAudio.Instance.ZombieGroan(Kind.Value);
+            }
 
             var playerPos = gm.Player != null ? gm.Player.transform.position : transform.position;
             Vector3 toPlayer = playerPos - transform.position;
@@ -387,6 +604,7 @@ namespace TheLastBullet.Gameplay
                     {
                         AttackState = AttackState.Lunge;
                         _attackTimer = 0.12f;
+                        if (_modelAnimator != null) _modelAnimator.PlayAttack();
                         gm.DamagePlayer(Damage);
                     }
                     break;
@@ -403,6 +621,8 @@ namespace TheLastBullet.Gameplay
 
             if (_animator != null)
                 _animator.SetFloat("Speed", _rb.velocity.magnitude);
+            if (_modelAnimator != null)
+                _modelAnimator.SetSpeed(_rb.velocity.magnitude);
             if (_placeholderRenderers != null && simTime < HitFlashUntil)
             {
                 foreach (var r in _placeholderRenderers)

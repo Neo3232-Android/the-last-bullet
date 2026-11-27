@@ -9,6 +9,9 @@ namespace TheLastBullet.Audio
     /// generated in code with AudioClip.Create (sine/noise envelopes), so the
     /// game ships zero audio files. A tiny pool of AudioSources plays them;
     /// nothing here needs a serialized asset, so it works headless too.
+    /// Since build 2 every public method first tries the matching recorded
+    /// clip via RecordedAudio and only uses the synth as a fallback when
+    /// the clip is missing (or RecordedAudio is not in the scene).
     /// </summary>
     public sealed class SynthAudio : MonoBehaviour
     {
@@ -21,7 +24,14 @@ namespace TheLastBullet.Audio
         public bool Muted
         {
             get => _muted;
-            set { _muted = value; if (_muted) StopAll(); }
+            set
+            {
+                _muted = value;
+                if (_muted) StopAll();
+                // Keep recorded audio in sync: muting must silence it too.
+                var rec = RecordedAudio.Instance;
+                if (rec != null) rec.Muted = value;
+            }
         }
 
         private void Awake()
@@ -43,9 +53,20 @@ namespace TheLastBullet.Audio
         }
 
         // ---- public API (called by GameManager / PlayerController / WeaponSystem / Bullet) ----
+        // Every method below first tries the recorded clip via RecordedAudio
+        // and only falls back to the procedural Tone() synth when the clip is
+        // missing (or RecordedAudio is not in the scene). Signatures unchanged.
+
+        /// <summary>True when the recorded clip played (no synth fallback needed).</summary>
+        private static bool TryRecorded(System.Func<RecordedAudio, bool> play)
+        {
+            var rec = RecordedAudio.Instance;
+            return rec != null && play(rec);
+        }
 
         public void Shoot(WeaponId id)
         {
+            if (TryRecorded(r => r.PlayWeaponShot(id))) return;
             switch (id)
             {
                 case WeaponId.Shotgun: Play("shotgun", Tone(140f, 0.18f, 0.5f, NoiseMix: 0.7f)); break;
@@ -69,16 +90,125 @@ namespace TheLastBullet.Audio
             }
         }
 
-        public void Reload() => Play("reload", Tone(500f, 0.18f, 0.3f, SlideTo: 900f));
-        public void Hit() => Play("hit", Tone(110f, 0.12f, 0.5f, NoiseMix: 0.4f));
-        public void ZombieDie() => Play("zdie", Tone(160f, 0.25f, 0.4f, SlideTo: 60f, NoiseMix: 0.4f));
-        public void BossDie() => Play("bdie", Tone(80f, 0.6f, 0.7f, SlideTo: 30f, NoiseMix: 0.5f));
-        public void Pickup() => Play("pickup", Tone(660f, 0.12f, 0.3f, SlideTo: 990f));
-        public void WaveStart() => Play("wave", Tone(330f, 0.25f, 0.4f, SlideTo: 660f));
-        public void LevelComplete() => Play("level", Tone(523f, 0.4f, 0.4f, SlideTo: 784f));
-        public void GameOver() => Play("over", Tone(220f, 0.8f, 0.5f, SlideTo: 55f));
-        public void Headshot() => Play("headshot", Tone(1400f, 0.08f, 0.35f, SlideTo: 700f));
-        public void UiClick() => Play("click", Tone(800f, 0.05f, 0.25f));
+        public void Reload()
+        {
+            if (TryRecorded(r => r.PlayReload())) return;
+            Play("reload", Tone(500f, 0.18f, 0.3f, SlideTo: 900f));
+        }
+
+        public void Hit()
+        {
+            if (TryRecorded(r => r.PlayFleshHit())) return;
+            Play("hit", Tone(110f, 0.12f, 0.5f, NoiseMix: 0.4f));
+        }
+
+        public void ZombieDie()
+        {
+            if (TryRecorded(r => r.PlayZombieDeath())) return;
+            Play("zdie", Tone(160f, 0.25f, 0.4f, SlideTo: 60f, NoiseMix: 0.4f));
+        }
+
+        public void BossDie()
+        {
+            if (TryRecorded(r => r.PlayBossDeath())) return;
+            Play("bdie", Tone(80f, 0.6f, 0.7f, SlideTo: 30f, NoiseMix: 0.5f));
+        }
+
+        public void Pickup()
+        {
+            if (TryRecorded(r => r.PlayPickup("coin"))) return;
+            Play("pickup", Tone(660f, 0.12f, 0.3f, SlideTo: 990f));
+        }
+
+        public void WaveStart()
+        {
+            if (TryRecorded(r => r.PlayWaveStart())) return;
+            Play("wave", Tone(330f, 0.25f, 0.4f, SlideTo: 660f));
+        }
+
+        public void LevelComplete()
+        {
+            if (TryRecorded(r => r.PlayLevelComplete())) return;
+            Play("level", Tone(523f, 0.4f, 0.4f, SlideTo: 784f));
+        }
+
+        public void GameOver()
+        {
+            if (TryRecorded(r => r.PlayGameOver())) return;
+            Play("over", Tone(220f, 0.8f, 0.5f, SlideTo: 55f));
+        }
+
+        public void Headshot()
+        {
+            if (TryRecorded(r => r.PlayHeadshot())) return;
+            Play("headshot", Tone(1400f, 0.08f, 0.35f, SlideTo: 700f));
+        }
+
+        public void UiClick()
+        {
+            if (TryRecorded(r => r.PlayUiClick())) return;
+            Play("click", Tone(800f, 0.05f, 0.25f));
+        }
+
+        // ---- new: ambient loops + boss intro + stings (RecordedAudio, synth fallback) ----
+
+        /// <summary>Starts the looping per-map ambience ("rain", "thunder"/"storm", anything else = night wind). No synth equivalent; no-op without RecordedAudio.</summary>
+        public void StartAmbience(string mapTheme)
+        {
+            TryRecorded(r => r.PlayAmbience(mapTheme));
+        }
+
+        /// <summary>Stops the looping ambience (call when returning to the menu).</summary>
+        public void StopAmbience()
+        {
+            var rec = RecordedAudio.Instance;
+            if (rec != null) rec.StopAmbience();
+        }
+
+        /// <summary>Boss intro: sting + the boss's roar.</summary>
+        public void PlayBossIntro(BossKind kind)
+        {
+            if (TryRecorded(r => r.PlayBossIntro(kind))) return;
+            Play("bossintro", Tone(80f, 0.6f, 0.7f, SlideTo: 30f, NoiseMix: 0.5f));
+        }
+
+        /// <summary>Victory sting (fanfare).</summary>
+        public void PlayVictorySting()
+        {
+            if (TryRecorded(r => r.PlayVictorySting())) return;
+            Play("level", Tone(523f, 0.4f, 0.4f, SlideTo: 784f));
+        }
+
+        /// <summary>Defeat sting.</summary>
+        public void PlayDefeatSting()
+        {
+            if (TryRecorded(r => r.PlayDefeatSting())) return;
+            Play("over", Tone(220f, 0.8f, 0.5f, SlideTo: 55f));
+        }
+
+        /// <summary>Zombie groan, per kind (recorded only — silence if missing).</summary>
+        public void ZombieGroan(ZombieKind kind)
+        {
+            TryRecorded(r => r.PlayZombieGroan(kind));
+        }
+
+        /// <summary>Footstep (recorded only — silence if missing).</summary>
+        public void Footstep(bool onGrass)
+        {
+            TryRecorded(r => r.PlayFootstep(onGrass));
+        }
+
+        /// <summary>Dodge-roll whoosh (recorded only — silence if missing).</summary>
+        public void DodgeRoll()
+        {
+            TryRecorded(r => r.PlayDodgeRoll());
+        }
+
+        /// <summary>Dry-fire click when the mag is empty (recorded only).</summary>
+        public void DryFire()
+        {
+            TryRecorded(r => r.PlayDryFire());
+        }
 
         // ---- synthesis ----
 

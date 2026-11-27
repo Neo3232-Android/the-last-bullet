@@ -53,11 +53,24 @@ namespace TheLastBullet.Data
         public int LastDailyMissionDay = -1;
         public Dictionary<string, int> WeeklyChallengeProgress = new Dictionary<string, int>();
         public int LastWeeklyChallengeWeek = -1;
+        public HashSet<string> CompletedDailyMissions = new HashSet<string>();
+        public HashSet<string> CompletedWeeklyChallenges = new HashSet<string>();
         public int LoginStreakDays;
         public int LastLoginDay = -1;
         public Dictionary<ZombieKind, int> BestiaryKills = new Dictionary<ZombieKind, int>();
         public Dictionary<BossKind, int> BossBestiaryKills = new Dictionary<BossKind, int>();
         public HashSet<string> SuperPerksUnlocked = new HashSet<string>();
+        /// <summary>Meta-shop upgrade levels, keyed by MetaUpgradeDef id ("damage", "health", ...).</summary>
+        public Dictionary<string, int> MetaUpgradeLevels = new Dictionary<string, int>();
+        /// <summary>Drone companion (meta-shop purchase): shoots alongside the player.</summary>
+        public bool HasDroneCompanion;
+        public int DroneLevel;
+        /// <summary>Survivors rescued (Escort wins). Counts toward the ally roster.</summary>
+        public int RescuedAllies;
+        public int DailyChallengeStreak;
+        public int LastDailyChallengeDay = -1;
+        public int TotalBossKills;
+        public int TotalEliteKills;
 
         // ---- Campaign progress (NEW in the Unity version) ----
         /// <summary>Highest unlocked level per map, keyed by map id name. Level 1 is always unlocked.</summary>
@@ -91,6 +104,18 @@ namespace TheLastBullet.Data
                 if ((BossBestiaryKills.TryGetValue(e.Kind, out int k) ? k : 0) >= e.KillsToComplete) n++;
             return n;
         }
+
+        public int BestiaryTotalCompletedCount() => BestiaryCompletedCount() + BossBestiaryCompletedCount();
+
+        public static int BestiaryTotalCount() =>
+            ProgressionData.Bestiary.Count + ProgressionData.BossBestiary.Count;
+
+        public int MetaUpgradeLevel(string id) =>
+            MetaUpgradeLevels.TryGetValue(id, out int v) ? v : 0;
+
+        /// <summary>Gold skin for a weapon is earned at max mastery (level 5).</summary>
+        public bool HasGoldSkin(WeaponId weaponId) =>
+            WeaponMasteryLevel(weaponId) >= WeaponData.MasteryMaxLevel;
     }
 
     public static class ProgressionData
@@ -307,6 +332,45 @@ namespace TheLastBullet.Data
                 "Gold perk. Excess damage explodes, damaging nearby zombies.",
                 "Overkill damage explodes in a small radius."),
         };
+
+        // ---- Meta shop: permanent upgrades bought with coins. ----
+        // BonusPerLevel is a fraction for damage/speed/reload/magnet, flat HP for health.
+        public sealed class MetaUpgradeDef
+        {
+            public string Id { get; }
+            public string Name { get; }
+            public string Description { get; }
+            public int BaseCost { get; }
+            public int MaxLevel { get; }
+            public float BonusPerLevel { get; }
+
+            public MetaUpgradeDef(string id, string name, string description,
+                int baseCost, int maxLevel, float bonusPerLevel)
+            {
+                Id = id; Name = name; Description = description;
+                BaseCost = baseCost; MaxLevel = maxLevel; BonusPerLevel = bonusPerLevel;
+            }
+
+            /// <summary>Cost to go from <paramref name="currentLevel"/> to the next level.</summary>
+            public int CostForLevel(int currentLevel) => BaseCost * (currentLevel + 1);
+        }
+
+        public static readonly List<MetaUpgradeDef> MetaUpgrades = new List<MetaUpgradeDef>
+        {
+            new MetaUpgradeDef("damage", "Damage", "+10% damage per level.", 300, 5, 0.10f),
+            new MetaUpgradeDef("health", "Health", "+25 max HP per level.", 300, 5, 25f),
+            new MetaUpgradeDef("speed", "Speed", "+5% move speed per level.", 250, 5, 0.05f),
+            new MetaUpgradeDef("reload", "Reload", "Reload 8% faster per level.", 250, 5, 0.08f),
+            new MetaUpgradeDef("magnet", "Magnet", "+25% pickup radius per level.", 200, 5, 0.25f),
+        };
+
+        public static MetaUpgradeDef GetMetaUpgrade(string id)
+        {
+            if (string.IsNullOrEmpty(id)) return null;
+            foreach (var u in MetaUpgrades)
+                if (u.Id == id) return u;
+            return null;
+        }
 
         private static void Shuffle<T>(List<T> list, Random random)
         {

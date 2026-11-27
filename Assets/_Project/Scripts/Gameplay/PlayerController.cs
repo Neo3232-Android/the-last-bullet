@@ -45,9 +45,13 @@ namespace TheLastBullet.Gameplay
         public bool IsReloading => ReloadingUntil > 0f;
         public bool IsLowHealth => Health <= MaxHealth / 4;
 
+        /// <summary>Flashlight (dark maps), set by GameManager.SpawnPlayer.</summary>
+        public Flashlight Flashlight { get; set; }
+
         private Rigidbody _rb;
         private CapsuleCollider _collider;
         private Animator _animator;
+        private ModelAnimator _modelAnimator;
         private RagdollController _ragdoll;
         private WeaponSystem _weapons;
         private PlayerState _state;
@@ -79,6 +83,18 @@ namespace TheLastBullet.Gameplay
             _animator = GetComponentInChildren<Animator>();
             _ragdoll = GetComponentInChildren<RagdollController>();
             BuildPlaceholderModel(character);
+
+            // Stage 2: swap the placeholder for the real mannequin-man FBX
+            // when it is bundled; otherwise keep the placeholder.
+            var realModel = ModelLibrary.InstantiatePlayerModel();
+            if (realModel != null)
+            {
+                SetModel(realModel);
+                // Creator's outfit colour tints the figure (single-material
+                // mannequin, so the whole figure takes the outfit colour).
+                if (ColorUtility.TryParseHtmlString(character.OutfitColor, out Color outfit))
+                    ModelLibrary.ApplyOutfitTint(realModel, outfit);
+            }
         }
 
         /// <summary>Stage 2: replace the placeholder with the real FBX model.</summary>
@@ -88,6 +104,7 @@ namespace TheLastBullet.Gameplay
             modelRoot.transform.SetParent(transform, false);
             modelRoot.transform.localPosition = Vector3.zero;
             _animator = modelRoot.GetComponentInChildren<Animator>();
+            _modelAnimator = modelRoot.GetComponentInChildren<ModelAnimator>();
             _ragdoll = modelRoot.GetComponentInChildren<RagdollController>();
         }
 
@@ -145,6 +162,7 @@ namespace TheLastBullet.Gameplay
                 ? move.normalized
                 : GameManager.AngleToDir(FacingAngle);
             DodgeRollTimer = 0.35f;
+            Audio.SynthAudio.Instance.DodgeRoll();
         }
 
         public void StartReload()
@@ -165,6 +183,7 @@ namespace TheLastBullet.Gameplay
             DeathState = DeathState.Falling;
             _rb.velocity = Vector3.zero;
             _rb.isKinematic = true;
+            if (_modelAnimator != null) _modelAnimator.PlayDeath();
             if (_ragdoll != null) _ragdoll.EnableRagdoll(Vector3.back);
             else if (_placeholderModel != null)
                 _placeholderModel.transform.Rotate(-90f, 0f, 0f); // fall over
@@ -211,13 +230,19 @@ namespace TheLastBullet.Gameplay
             {
                 if (DodgeRollTimer <= 0f)
                     FacingAngle = Mathf.Atan2(move.z, move.x);
+                // Footstep on each step: WalkPhase crosses a multiple of PI.
+                float prevPhase = WalkPhase;
                 WalkPhase += dt * move.magnitude * speed * WalkCycleRate;
+                if (Mathf.Floor(WalkPhase / Mathf.PI) != Mathf.Floor(prevPhase / Mathf.PI))
+                    Audio.SynthAudio.Instance.Footstep(false);
                 transform.rotation = Quaternion.Euler(0f, GameManager.AngleToYaw(FacingAngle), 0f);
             }
 
             // Aim.
             if (_aimInput.sqrMagnitude > 0.04f)
                 AimAngle = Mathf.Atan2(_aimInput.y, _aimInput.x);
+            // Flashlight follows the aim stick.
+            if (Flashlight != null) Flashlight.SetAim(AimAngle, FacingAngle);
 
             // Reload completion.
             if (IsReloading && gm.SimTime >= ReloadingUntil)
@@ -250,6 +275,8 @@ namespace TheLastBullet.Gameplay
                 _animator.SetFloat("Speed", move.magnitude * speed);
                 _animator.SetBool("IsFiring", _firing);
             }
+            if (_modelAnimator != null)
+                _modelAnimator.SetSpeed(move.magnitude * speed);
 
             // Hit flash on the placeholder.
             if (_placeholderRenderers != null && gm.SimTime < HitFlashUntil)

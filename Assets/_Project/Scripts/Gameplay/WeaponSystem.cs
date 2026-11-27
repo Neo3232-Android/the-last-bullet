@@ -45,6 +45,14 @@ namespace TheLastBullet.Gameplay
                 + Vector3.up * 1.1f;
             var rng = gm.Rng;
 
+            // Per-weapon muzzle flash + ejected shell casing (Katana is melee).
+            if (gm.Juice != null)
+            {
+                gm.Juice.SpawnMuzzleFlash(muzzle, def.Id == WeaponId.Shotgun ? 0.7f : 0.4f);
+                if (def.Id != WeaponId.Katana)
+                    gm.Juice.SpawnShellCasing(transform.position + Vector3.up * 1.0f);
+            }
+
             switch (def.Id)
             {
                 case WeaponId.Katana:
@@ -67,6 +75,9 @@ namespace TheLastBullet.Gameplay
                         if (hits > def.PierceCount) break;
                         gm.DamageZombie(z, damage, gm.RollCrit(),
                             (z.transform.position - transform.position).normalized);
+                        if (gm.Juice != null)
+                            gm.Juice.SpawnDamageNumber(z.transform.position + Vector3.up * 1.2f,
+                                Mathf.RoundToInt(damage), false);
                         hits++;
                     }
                     gm.Juice.SpawnGoo(transform.position + GameManager.AngleToDir(aimAngleRad), 6);
