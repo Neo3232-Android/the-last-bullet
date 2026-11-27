@@ -61,9 +61,13 @@ namespace TheLastBullet.Editor
             PlayerSettings.allowedAutorotateToLandscapeLeft = false;
             PlayerSettings.allowedAutorotateToLandscapeRight = false;
 
-            // Android 16 (API 36) is required for new Play Store apps since Aug 2026.
+            // Target API 35 (Android 15): the UBA builders ship Android SDK 35
+            // pre-installed, and the Mac builder cannot install Platform 36
+            // on demand (build 13 died at "Installing Android SDK Platform 36").
+            // API 35 is the Play Store minimum for new apps (Aug 2025); API 36
+            // only becomes required in Aug 2026, so revisit then for release.
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
-            PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)36;
+            PlayerSettings.Android.targetSdkVersion = AndroidSdkVersions.AndroidApiLevel35;
             PlayerSettings.SetScriptingBackend(BuildTargetGroup.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.SetApiCompatibilityLevel(BuildTargetGroup.Android, ApiCompatibilityLevel.NET_Standard);
