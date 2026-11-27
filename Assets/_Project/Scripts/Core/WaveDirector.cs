@@ -88,7 +88,7 @@ namespace TheLastBullet.Core
             if (def.IsBossWave)
             {
                 var boss = ZombieData.BossForLevel(MapData.IndexOf(map.Id), waveNumber / 5 - 1);
-                _queue.Enqueue(new Spawn { BossKind = boss, Position = EdgePosition() });
+                _queue.Enqueue(new Spawn { BossKind = boss.Kind, Position = EdgePosition() });
             }
             var flat = new List<ZombieKind>();
             foreach (var kv in def.Spawns)

@@ -433,7 +433,7 @@ namespace TheLastBullet.Gameplay
             if (!BossKind.HasValue) return;
             switch (BossKind.Value)
             {
-                case BossKind.Charger:
+                case Data.BossKind.Charger:
                     if (_isTelegraphing)
                     {
                         _chargeTimer -= dt;
@@ -462,7 +462,7 @@ namespace TheLastBullet.Gameplay
                         _chargeTimer = 0.8f;
                     }
                     break;
-                case BossKind.Summoner:
+                case Data.BossKind.Summoner:
                     if (_summonCooldown <= 0f)
                     {
                         _summonCooldown = 10f;
@@ -470,7 +470,7 @@ namespace TheLastBullet.Gameplay
                         for (int i = 0; i < n; i++) gm.SummonNear(transform.position, null);
                     }
                     break;
-                case BossKind.SpitterKing:
+                case Data.BossKind.SpitterKing:
                     if (_spitCooldown <= 0f && dist < 10f)
                     {
                         _spitCooldown = 4f;
@@ -481,7 +481,7 @@ namespace TheLastBullet.Gameplay
                         }
                     }
                     break;
-                case BossKind.TheButcher:
+                case Data.BossKind.TheButcher:
                     // Massive cleaver arc: everything within reach takes a heavy hit.
                     if (_attackCooldown <= 0f && dist < 2.6f)
                     {
@@ -490,7 +490,7 @@ namespace TheLastBullet.Gameplay
                         gm.Juice.AddShake(0.6f);
                     }
                     break;
-                case BossKind.PlagueQueen:
+                case Data.BossKind.PlagueQueen:
                     if (_summonCooldown <= 0f)
                     {
                         _summonCooldown = 12f;

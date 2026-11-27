@@ -53,7 +53,7 @@ namespace TheLastBullet.Core
         public int ShotsHit { get; private set; }
         public int KillStreak { get; private set; }
         public List<PerkId> PendingPerkChoices { get; private set; } = new List<PerkId>();
-        public bool Won { get; private set; }
+        public bool Won { get; set; }
         public bool IsSlowMo { get; private set; }
 
         public float ParticleScale { get; private set; } = 1f;
@@ -147,7 +147,7 @@ namespace TheLastBullet.Core
         public float FpsEstimate => _fpsEstimate;
         public float SimTime => _simTime;
         public bool IsPaused => _paused;
-        public DailyMutation TodayMutation { get; private set; }
+        public ZombieData.DailyMutation TodayMutation { get; private set; }
         public bool IsInstaKillActive => _simTime < _instaKillUntil;
         public void RegisterHeadshot() => Headshots++;
         public void AddCoins(int amount) { RunCoins += amount; SyncCoins(); }
@@ -340,10 +340,10 @@ namespace TheLastBullet.Core
         {
             z.BeginDeath();
             int scoreValue = z.IsBoss
-                ? ZombieData.GetBoss(z.BossKind).ScoreValue
+                ? ZombieData.GetBoss(z.BossKind.Value).ScoreValue
                 : ZombieData.Get(z.Kind.Value).ScoreValue;
             int coinValue = z.IsBoss
-                ? ZombieData.GetBoss(z.BossKind).CoinValue
+                ? ZombieData.GetBoss(z.BossKind.Value).CoinValue
                 : ZombieData.Get(z.Kind.Value).CoinValue;
             Score += (int)(scoreValue * ScoreMultiplier());
             RunCoins += (int)(coinValue * CoinMultiplierNow());

@@ -1,0 +1,70 @@
+# Cloud Build — Unity Build Automation (UBA)
+#
+# Builds the Android APK on Unity's own machines, because a Unity Personal
+# license cannot be activated on GitHub-hosted runners (manual/.alf
+# activation is closed to Personal, and new Hub activations write a
+# machine-bound license file). UBA holds the license on its side.
+#
+# Manual trigger ONLY. UBA build minutes are limited (200 Windows min/month
+# free), so every build is started deliberately — never by a push.
+# The game-ci android-build workflow was removed for the same reason:
+# it cannot run without a UNITY_LICENSE secret that Personal cannot provide.
+
+name: Cloud Build (Unity Build Automation)
+
+on:
+  workflow_dispatch:
+    inputs:
+      clean:
+        description: "Clean build (ignore the target's cached Library)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: uba-android-main
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Android APK on Unity Build Automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      UBA_ORG_ID: ${{ vars.UBA_ORG_ID }}
+      UBA_PROJECT_ID: ${{ vars.UBA_PROJECT_ID }}
+      UBA_TARGET: ${{ vars.UBA_TARGET }}
+      UNITY_SERVICE_ACCOUNT_ID: ${{ secrets.UNITY_SERVICE_ACCOUNT_ID }}
+      UNITY_SERVICE_ACCOUNT_SECRET: ${{ secrets.UNITY_SERVICE_ACCOUNT_SECRET }}
+      DOWNLOAD_DIR: uba-artifact
+      UBA_STATE_FILE: uba-build-state.env
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Start and wait for the UBA build
+        id: uba
+        run: bash .github/scripts/uba-build.sh
+        env:
+          CLEAN: ${{ inputs.clean }}
+
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: the-last-bullet-apk
+          path: uba-artifact/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Cancel the UBA build if this run is cancelled
+        if: cancelled()
+        run: |
+          if [ -f "$UBA_STATE_FILE" ]; then
+            # shellcheck disable=SC1090
+            source "$UBA_STATE_FILE"
+            if [ -n "${UBA_BUILD_NUMBER:-}" ]; then
+              curl -s -u "${UNITY_SERVICE_ACCOUNT_ID}:${UNITY_SERVICE_ACCOUNT_SECRET}" \
+                -X DELETE "https://build-automation.services.api.unity.com/v2/orgs/${UBA_ORG_ID}/projects/${UBA_PROJECT_ID}/buildtargets/${UBA_TARGET}/builds/${UBA_BUILD_NUMBER}" || true
+              echo "Cancelled UBA build #${UBA_BUILD_NUMBER}"
+            fi
+          fi

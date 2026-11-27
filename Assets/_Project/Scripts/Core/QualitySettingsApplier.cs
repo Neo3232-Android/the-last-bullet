@@ -22,7 +22,7 @@ namespace TheLastBullet.Core
             QualitySettings.vSyncCount = 0; // mobile: rely on targetFrameRate, not vsync
 
             // URP: render scale + shadows are the two biggest mobile levers.
-            var urp = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            var urp = GraphicsSettings.renderPipelineAsset as UniversalRenderPipelineAsset;
             if (urp != null)
             {
                 urp.renderScale = def.ResolutionScale;

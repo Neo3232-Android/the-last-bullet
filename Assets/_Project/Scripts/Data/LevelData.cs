@@ -113,7 +113,7 @@ namespace TheLastBullet.Data
 
                 int zonesOpen = Math.Min(map.Zones.Count, 1 + (level - 1) / 2);
                 string bossName = isBossLevel
-                    ? ZombieData.GetBoss(ZombieData.BossForLevel(mapIndex, level / 5 - 1)).Name
+                    ? ZombieData.BossForLevel(mapIndex, level / 5 - 1).Name
                     : string.Empty;
 
                 var def = new LevelDef
@@ -123,7 +123,7 @@ namespace TheLastBullet.Data
                     Name = map.Name + " — Level " + level + (isBossLevel ? " (" + bossName + ")" : string.Empty),
                     WaveCount = isBossLevel ? 2 : WavesPerLevel,
                     IsBossLevel = isBossLevel,
-                    Boss = isBossLevel ? ZombieData.BossForLevel(mapIndex, level / 5 - 1) : BossKind.Charger,
+                    Boss = isBossLevel ? ZombieData.BossForLevel(mapIndex, level / 5 - 1).Kind : BossKind.Charger,
                     ZombieMix = mix,
                     HealthScale = 1f + 0.12f * (level - 1),
                     CountScale = 1f + 0.25f * (level - 1),

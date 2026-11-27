@@ -23,7 +23,7 @@ namespace TheLastBullet.Gameplay
         {
             var gm = GameManager.Instance;
             var ps = gm.State.Player;
-            float interval = 1f / def.fireRatePerSec;
+            float interval = 1f / def.FireRatePerSec;
             if (def.Id == WeaponId.Minigun)
             {
                 float ramp = Mathf.Clamp(0.2f + 0.8f * (_player.SpinUp / 0.5f), 0.2f, 1f);

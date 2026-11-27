@@ -61,12 +61,10 @@ namespace TheLastBullet.Audio
                 case WeaponId.AcidGun: Play("acid", Tone(300f, 0.15f, 0.3f, SlideTo: 150f, NoiseMix: 0.5f)); break;
                 case WeaponId.ToxicSprayer: Play("toxic", Tone(260f, 0.18f, 0.3f, NoiseMix: 0.7f)); break;
                 case WeaponId.PlasmaCannon: Play("plasma", Tone(200f, 0.3f, 0.6f, SlideTo: 80f, NoiseMix: 0.3f)); break;
-                case WeaponId.SniperRifle: Play("sniper", Tone(1000f, 0.22f, 0.55f, SlideTo: 150f)); break;
-                case WeaponId.SMG: Play("smg", Tone(220f, 0.08f, 0.4f, NoiseMix: 0.5f)); break;
+                case WeaponId.Smg: Play("smg", Tone(220f, 0.08f, 0.4f, NoiseMix: 0.5f)); break;
                 case WeaponId.Rifle: Play("rifle", Tone(160f, 0.14f, 0.45f, NoiseMix: 0.6f)); break;
                 case WeaponId.Crossbow: Play("crossbow", Tone(600f, 0.1f, 0.35f, SlideTo: 200f)); break;
                 case WeaponId.DualPistols: Play("dual", Tone(190f, 0.1f, 0.4f, NoiseMix: 0.5f)); break;
-                case WeaponId.Revolver: Play("revolver", Tone(130f, 0.16f, 0.5f, NoiseMix: 0.6f)); break;
                 default: Play("pistol", Tone(200f, 0.1f, 0.4f, NoiseMix: 0.5f)); break; // Pistol
             }
         }
