@@ -122,7 +122,7 @@ namespace TheLastBullet.Core
         {
             if (_damageNumbers != null) return;
             _damageNumbers = new DamageNumber[DamageNumberPoolSize];
-            var font = Resources.GetBuiltinResource<UnityEngine.UI.Font>("Arial.ttf");
+            var font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             for (int i = 0; i < DamageNumberPoolSize; i++)
             {
                 var go = new GameObject("DamageNumber_" + i);
@@ -131,7 +131,7 @@ namespace TheLastBullet.Core
                 tm.font = font;
                 tm.fontSize = 48;
                 tm.characterSize = 0.08f;
-                tm.anchor = UnityEngine.UI.TextAnchor.MiddleCenter;
+                tm.anchor = TextAnchor.MiddleCenter;
                 tm.color = Color.white;
                 go.SetActive(false);
                 _damageNumbers[i] = new DamageNumber { Text = tm, Life = 0f, BaseColor = Color.white };
