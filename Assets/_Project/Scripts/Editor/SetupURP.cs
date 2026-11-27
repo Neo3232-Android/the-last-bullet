@@ -22,7 +22,10 @@ namespace TheLastBullet.Editor
         [MenuItem("The Last Bullet/Setup URP")]
         public static void CreateURPAssetMenu() => EnsureURPAsset();
 
-        public static UniversalRenderPipelineAsset EnsureURPAsset()
+        /// <summary>Creates the URP asset + renderer if missing and assigns it.
+        /// refresh=false skips AssetDatabase.Refresh (used by the build
+        /// preprocessor, where a refresh during the build is not wanted).</summary>
+        public static UniversalRenderPipelineAsset EnsureURPAsset(bool refresh = true)
         {
             var existing = AssetDatabase.LoadAssetAtPath<UniversalRenderPipelineAsset>(PipelinePath);
             if (existing != null)
@@ -48,7 +51,8 @@ namespace TheLastBullet.Editor
 
             GraphicsSettings.renderPipelineAsset = pipeline;
             AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
+            if (refresh)
+                AssetDatabase.Refresh();
             Debug.Log("URP asset created at " + PipelinePath);
             return pipeline;
         }
