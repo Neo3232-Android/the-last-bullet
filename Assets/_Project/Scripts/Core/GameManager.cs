@@ -386,7 +386,7 @@ namespace TheLastBullet.Core
             {
                 var es = new GameObject("EventSystem");
                 es.AddComponent<UnityEngine.EventSystems.EventSystem>();
-                es.AddComponent<UnityEngine.EventSystems.InputSystemUIInputModule>();
+                es.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
                 DontDestroyOnLoad(es);
             }
         }

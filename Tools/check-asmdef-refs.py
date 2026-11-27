@@ -80,9 +80,16 @@ def main():
                     problems += 1
             # Fully-qualified references (no using directive) that live in a
             # package assembly: InputSystemUIInputModule is in the
-            # UnityEngine.EventSystems NAMESPACE but the Unity.InputSystem
-            # ASSEMBLY. Build #15 failed on exactly this (CS0234), so the
-            # checker must catch it even without a using directive.
+            # UnityEngine.InputSystem.UI NAMESPACE (Input System 1.1+,
+            # verified against the 1.14.2 package source) but the
+            # Unity.InputSystem ASSEMBLY. Build #15 failed on the missing
+            # assembly reference (CS0234) and build #16 on the wrong
+            # namespace (the old UnityEngine.EventSystems one no longer
+            # exists), so the checker must catch both even without a using
+            # directive.
+            if re.search(r"EventSystems\.InputSystemUIInputModule", src):
+                print(f"WRONG NAMESPACE: {name} uses 'UnityEngine.EventSystems.InputSystemUIInputModule' in {os.path.relpath(cs, ROOT)} — the type moved to UnityEngine.InputSystem.UI in Input System 1.1+")
+                problems += 1
             if re.search(r"\bInputSystemUIInputModule\b", src) and "Unity.InputSystem" not in refs:
                 print(f"MISSING: {name} needs 'Unity.InputSystem' (fully-qualified InputSystemUIInputModule in {os.path.relpath(cs, ROOT)})")
                 problems += 1
