@@ -45,12 +45,13 @@ namespace TheLastBullet.Editor
                 Debug.LogWarning("m_AlwaysIncludedShaders not found in GraphicsSettings");
                 return;
             }
+            // Legacy uGUI Text uses the built-in Arial font + UI/Default Font
+            // shader (always in the build); TextMeshPro is gone from the UI,
+            // so its shaders are no longer force-included.
             string[] names =
             {
                 "UI/Default",
-                "TextMeshPro/Distance Field",
-                "TextMeshPro/Distance Field Overlay",
-                "TextMeshPro/Sprite",
+                "UI/Default Font",
                 "Sprites/Default",
                 "Universal Render Pipeline/Lit",
             };

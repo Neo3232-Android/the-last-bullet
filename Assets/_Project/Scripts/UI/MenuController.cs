@@ -1,14 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 using TheLastBullet.Core;
 using TheLastBullet.Data;
 
 namespace TheLastBullet.UI
 {
     /// <summary>
-    /// Main menu, built entirely in code (uGUI + TextMeshPro): map grid (20
+    /// Main menu, built entirely in code (uGUI (built-in Text)): map grid (20
     /// maps), level row (10 levels per map, locks + medals), campaign/endless
     /// start, character creator (skin, hair, outfit, accessory, starting
     /// weapon/perk), and settings (quality, mute). Created by Bootstrap;
@@ -17,10 +16,10 @@ namespace TheLastBullet.UI
     public sealed class MenuController : MonoBehaviour
     {
         private Canvas _canvas;
-        private TextMeshProUGUI _coinsText;
-        private TextMeshProUGUI _selectedMapText;
-        private TextMeshProUGUI _creatorText;
-        private TextMeshProUGUI _settingsText;
+        private Text _coinsText;
+        private Text _selectedMapText;
+        private Text _creatorText;
+        private Text _settingsText;
         private readonly List<Button> _mapButtons = new List<Button>();
         private readonly List<Button> _levelButtons = new List<Button>();
         private MapId _selectedMap = MapId.CityStreet;
@@ -78,16 +77,16 @@ namespace TheLastBullet.UI
             canvasGo.AddComponent<GraphicRaycaster>();
 
             var title = MakeText(canvasGo.transform, "THE LAST BULLET", new Vector2(0, -40),
-                new Vector2(700, 70), TextAlignmentOptions.Top);
+                new Vector2(700, 70), TextAnchor.UpperCenter);
             title.fontSize = 52;
             title.color = new Color(1f, 0.84f, 0f);
             MakeText(canvasGo.transform, "20 maps. 200 levels. Survive.", new Vector2(0, -110),
-                new Vector2(700, 30), TextAlignmentOptions.Top).fontSize = 22;
+                new Vector2(700, 30), TextAnchor.UpperCenter).fontSize = 22;
             _coinsText = MakeText(canvasGo.transform, "Coins: 0", new Vector2(0, -150),
-                new Vector2(700, 30), TextAlignmentOptions.Top);
+                new Vector2(700, 30), TextAnchor.UpperCenter);
 
             _selectedMapText = MakeText(canvasGo.transform, "", new Vector2(0, -195),
-                new Vector2(700, 30), TextAlignmentOptions.Top);
+                new Vector2(700, 30), TextAnchor.UpperCenter);
 
             // Map grid: 4 columns x 5 rows.
             for (int i = 0; i < MapData.All.Count; i++)
@@ -121,7 +120,7 @@ namespace TheLastBullet.UI
 
             // Character creator.
             _creatorText = MakeText(canvasGo.transform, "", new Vector2(0, -850),
-                new Vector2(700, 30), TextAlignmentOptions.Top);
+                new Vector2(700, 30), TextAnchor.UpperCenter);
             MakeButton(canvasGo.transform, "Skin", new Vector2(-240, -900), new Vector2(140, 54),
                 () => Cycle(SkinTones, () => SaveSystem.Instance.Character.SkinTone,
                     v => SaveSystem.Instance.Character.SkinTone = v));
@@ -142,7 +141,7 @@ namespace TheLastBullet.UI
 
             // Settings.
             _settingsText = MakeText(canvasGo.transform, "", new Vector2(0, -970),
-                new Vector2(700, 30), TextAlignmentOptions.Top);
+                new Vector2(700, 30), TextAnchor.UpperCenter);
             MakeButton(canvasGo.transform, "Quality", new Vector2(-90, -1020), new Vector2(160, 54),
                 () =>
                 {
@@ -190,7 +189,7 @@ namespace TheLastBullet.UI
             for (int i = 0; i < _levelButtons.Count; i++)
             {
                 int lvl = i + 1;
-                var label = _levelButtons[i].GetComponentInChildren<TextMeshProUGUI>();
+                var label = _levelButtons[i].GetComponentInChildren<Text>();
                 string medal = "";
                 if (profile.BestMedalPerLevel.TryGetValue($"{_selectedMap}-{lvl}", out var m) && m != MedalTier.None)
                     medal = m == MedalTier.Platinum ? " P" : m == MedalTier.Gold ? " G" : m == MedalTier.Silver ? " S" : " B";
@@ -207,8 +206,8 @@ namespace TheLastBullet.UI
         private static string ShortName(string name) =>
             name.Length > 12 ? name.Substring(0, 11) + "…" : name;
 
-        private TextMeshProUGUI MakeText(Transform parent, string text, Vector2 anchoredPos,
-            Vector2 size, TextAlignmentOptions align)
+        private Text MakeText(Transform parent, string text, Vector2 anchoredPos,
+            Vector2 size, TextAnchor align)
         {
             var go = new GameObject("Text");
             go.transform.SetParent(parent, false);
@@ -217,13 +216,12 @@ namespace TheLastBullet.UI
             rt.anchoredPosition = anchoredPos;
             rt.sizeDelta = size;
             rt.pivot = new Vector2(0.5f, 1f);
-            var tmp = go.AddComponent<TextMeshProUGUI>();
+            var tmp = go.AddComponent<Text>();
+            tmp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             tmp.text = text;
             tmp.fontSize = 24;
             tmp.color = Color.white;
             tmp.alignment = align;
-            tmp.outlineWidth = 0.15f;
-            tmp.outlineColor = Color.black;
             return tmp;
         }
 
@@ -236,7 +234,7 @@ namespace TheLastBullet.UI
             rt.anchorMin = new Vector2(0.5f, 1f); rt.anchorMax = new Vector2(0.5f, 1f);
             rt.anchoredPosition = anchoredPos; rt.sizeDelta = size;
             var img = go.AddComponent<Image>();
-            img.color = new Color(0.12f, 0.12f, 0.14f, 0.9f);
+            img.color = new Color(0.25f, 0.25f, 0.32f, 0.95f);
             var btn = go.AddComponent<Button>();
             btn.onClick.AddListener(onClick);
             var textGo = new GameObject("Label");
@@ -244,11 +242,12 @@ namespace TheLastBullet.UI
             var textRt = textGo.AddComponent<RectTransform>();
             textRt.anchorMin = Vector2.zero; textRt.anchorMax = Vector2.one;
             textRt.offsetMin = Vector2.zero; textRt.offsetMax = Vector2.zero;
-            var tmp = textGo.AddComponent<TextMeshProUGUI>();
+            var tmp = textGo.AddComponent<Text>();
+            tmp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             tmp.text = label;
             tmp.fontSize = 20;
             tmp.color = new Color(1f, 0.84f, 0f);
-            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.alignment = TextAnchor.MiddleCenter;
             return btn;
         }
     }

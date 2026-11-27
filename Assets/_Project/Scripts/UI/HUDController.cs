@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 using TheLastBullet.Core;
 using TheLastBullet.Data;
 using TheLastBullet.Gameplay;
@@ -9,7 +8,7 @@ using TheLastBullet.Gameplay;
 namespace TheLastBullet.UI
 {
     /// <summary>
-    /// In-run HUD, built entirely in code (uGUI + TextMeshPro): health/XP bars,
+    /// In-run HUD, built entirely in code (uGUI (built-in Text)): health/XP bars,
     /// coins/kills/wave, ammo, boss bar, perk-choice overlay (the game pauses
     /// its simulation while choices are pending), buildable shop buttons,
     /// dodge/swap/pause, and the game-over panel. Created once by
@@ -18,13 +17,13 @@ namespace TheLastBullet.UI
     public sealed class HUDController : MonoBehaviour
     {
         private Canvas _canvas;
-        private TextMeshProUGUI _coinsText, _killsText, _waveText, _ammoText, _timerText;
+        private Text _coinsText, _killsText, _waveText, _ammoText, _timerText;
         private Image _healthFill, _xpFill, _bossFill;
-        private TextMeshProUGUI _bossNameText;
+        private Text _bossNameText;
         private GameObject _bossBar, _perkPanel, _gameOverPanel;
-        private TextMeshProUGUI _gameOverText;
+        private Text _gameOverText;
         private readonly List<Button> _perkButtons = new List<Button>();
-        private readonly List<TextMeshProUGUI> _perkLabels = new List<TextMeshProUGUI>();
+        private readonly List<Text> _perkLabels = new List<Text>();
         private bool _shown;
 
         public void Show() { _shown = true; if (_canvas != null) _canvas.gameObject.SetActive(true); }
@@ -56,13 +55,13 @@ namespace TheLastBullet.UI
 
             // Top-right: coins / kills / wave / timer.
             _coinsText = MakeText(canvasGo.transform, "Coins: 0", new Vector2(-20, -20),
-                new Vector2(300, 30), TextAlignmentOptions.TopRight);
+                new Vector2(300, 30), TextAnchor.UpperRight);
             _killsText = MakeText(canvasGo.transform, "Kills: 0", new Vector2(-20, -52),
-                new Vector2(300, 26), TextAlignmentOptions.TopRight);
+                new Vector2(300, 26), TextAnchor.UpperRight);
             _waveText = MakeText(canvasGo.transform, "Wave 1", new Vector2(-20, -84),
-                new Vector2(300, 26), TextAlignmentOptions.TopRight);
+                new Vector2(300, 26), TextAnchor.UpperRight);
             _timerText = MakeText(canvasGo.transform, "0:00", new Vector2(-20, -116),
-                new Vector2(300, 26), TextAlignmentOptions.TopRight);
+                new Vector2(300, 26), TextAnchor.UpperRight);
 
             // Boss bar (top-center, hidden unless a boss is alive).
             _bossBar = new GameObject("BossBar");
@@ -82,12 +81,12 @@ namespace TheLastBullet.UI
             bossFillRt.anchorMin = Vector2.zero; bossFillRt.anchorMax = Vector2.one;
             bossFillRt.offsetMin = Vector2.zero; bossFillRt.offsetMax = Vector2.zero;
             _bossNameText = MakeText(canvasGo.transform, "", new Vector2(0, -180),
-                new Vector2(500, 26), TextAlignmentOptions.Top);
+                new Vector2(500, 26), TextAnchor.UpperCenter);
             _bossBar.SetActive(false);
 
             // Ammo (bottom-right, above the aim stick).
             _ammoText = MakeText(canvasGo.transform, "", new Vector2(-20, 200),
-                new Vector2(300, 30), TextAlignmentOptions.BottomRight);
+                new Vector2(300, 30), TextAnchor.LowerRight);
 
             // Build buttons (bottom-center).
             MakeButton(canvasGo.transform, "Barricade 100", new Vector2(-140, 40), new Vector2(130, 56),
@@ -156,27 +155,26 @@ namespace TheLastBullet.UI
             return fill;
         }
 
-        private TextMeshProUGUI MakeText(Transform parent, string text, Vector2 anchoredPos,
-            Vector2 size, TextAlignmentOptions align)
+        private Text MakeText(Transform parent, string text, Vector2 anchoredPos,
+            Vector2 size, TextAnchor align)
         {
             var go = new GameObject("Text");
             go.transform.SetParent(parent, false);
             var rt = go.AddComponent<RectTransform>();
-            bool right = align == TextAlignmentOptions.TopRight || align == TextAlignmentOptions.BottomRight;
-            bool top = align == TextAlignmentOptions.TopRight || align == TextAlignmentOptions.Top;
-            bool centered = align == TextAlignmentOptions.Center || align == TextAlignmentOptions.Top;
+            bool right = align == TextAnchor.UpperRight || align == TextAnchor.LowerRight;
+            bool top = align == TextAnchor.UpperRight || align == TextAnchor.UpperCenter;
+            bool centered = align == TextAnchor.MiddleCenter || align == TextAnchor.UpperCenter;
             rt.anchorMin = new Vector2(centered ? 0.5f : right ? 1f : 0f, top ? 1f : 0f);
             rt.anchorMax = rt.anchorMin;
             rt.anchoredPosition = anchoredPos;
             rt.sizeDelta = size;
             rt.pivot = new Vector2(centered ? 0.5f : right ? 1f : 0f, top ? 1f : 0f);
-            var tmp = go.AddComponent<TextMeshProUGUI>();
+            var tmp = go.AddComponent<Text>();
+            tmp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             tmp.text = text;
             tmp.fontSize = 24;
             tmp.color = Color.white;
             tmp.alignment = align;
-            tmp.outlineWidth = 0.15f;
-            tmp.outlineColor = Color.black;
             return tmp;
         }
 
@@ -190,7 +188,7 @@ namespace TheLastBullet.UI
             rt.anchorMax = new Vector2(0.5f, topAnchor ? 1f : 0f);
             rt.anchoredPosition = anchoredPos; rt.sizeDelta = size;
             var img = go.AddComponent<Image>();
-            img.color = new Color(0.1f, 0.1f, 0.12f, 0.75f);
+            img.color = new Color(0.2f, 0.2f, 0.26f, 0.85f);
             var btn = go.AddComponent<Button>();
             btn.onClick.AddListener(onClick);
             var textGo = new GameObject("Label");
@@ -198,11 +196,12 @@ namespace TheLastBullet.UI
             var textRt = textGo.AddComponent<RectTransform>();
             textRt.anchorMin = Vector2.zero; textRt.anchorMax = Vector2.one;
             textRt.offsetMin = Vector2.zero; textRt.offsetMax = Vector2.zero;
-            var tmp = textGo.AddComponent<TextMeshProUGUI>();
+            var tmp = textGo.AddComponent<Text>();
+            tmp.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
             tmp.text = label;
             tmp.fontSize = 20;
             tmp.color = new Color(1f, 0.84f, 0f);
-            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.alignment = TextAnchor.MiddleCenter;
             return btn;
         }
 
@@ -216,7 +215,7 @@ namespace TheLastBullet.UI
             var bg = _perkPanel.AddComponent<Image>();
             bg.color = new Color(0f, 0f, 0f, 0.8f);
             var title = MakeText(_perkPanel.transform, "LEVEL UP — pick a perk", new Vector2(0, 160),
-                new Vector2(600, 40), TextAlignmentOptions.Center);
+                new Vector2(600, 40), TextAnchor.MiddleCenter);
             title.fontSize = 30;
             for (int i = 0; i < 3; i++)
             {
@@ -229,7 +228,7 @@ namespace TheLastBullet.UI
                             gm.ApplyPerk(gm.PendingPerkChoices[index]);
                     });
                 _perkButtons.Add(btn);
-                var label = btn.GetComponentInChildren<TextMeshProUGUI>();
+                var label = btn.GetComponentInChildren<Text>();
                 _perkLabels.Add(label);
             }
             _perkPanel.SetActive(false);
@@ -245,7 +244,7 @@ namespace TheLastBullet.UI
             var bg = _gameOverPanel.AddComponent<Image>();
             bg.color = new Color(0f, 0f, 0f, 0.85f);
             _gameOverText = MakeText(_gameOverPanel.transform, "", new Vector2(0, 100),
-                new Vector2(640, 300), TextAlignmentOptions.Center);
+                new Vector2(640, 300), TextAnchor.MiddleCenter);
             _gameOverText.fontSize = 28;
             MakeButton(_gameOverPanel.transform, "RETRY", new Vector2(0, -120), new Vector2(220, 70),
                 () =>
