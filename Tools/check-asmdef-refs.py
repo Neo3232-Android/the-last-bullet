@@ -78,6 +78,17 @@ def main():
                 if need == "TheLastBullet" and name != "TheLastBullet" and "TheLastBullet" not in refs:
                     print(f"MISSING: {name} needs 'TheLastBullet' (used in {os.path.relpath(cs, ROOT)})")
                     problems += 1
+            # Fully-qualified references (no using directive) that live in a
+            # package assembly: InputSystemUIInputModule is in the
+            # UnityEngine.EventSystems NAMESPACE but the Unity.InputSystem
+            # ASSEMBLY. Build #15 failed on exactly this (CS0234), so the
+            # checker must catch it even without a using directive.
+            if re.search(r"\bInputSystemUIInputModule\b", src) and "Unity.InputSystem" not in refs:
+                print(f"MISSING: {name} needs 'Unity.InputSystem' (fully-qualified InputSystemUIInputModule in {os.path.relpath(cs, ROOT)})")
+                problems += 1
+            if re.search(r"UnityEngine\.InputSystem\.", src) and "Unity.InputSystem" not in refs:
+                print(f"MISSING: {name} needs 'Unity.InputSystem' (fully-qualified UnityEngine.InputSystem.* in {os.path.relpath(cs, ROOT)})")
+                problems += 1
     if problems:
         print(f"\n{problems} missing reference(s) — the Unity build will fail with CS0234/CS0246.")
         return 1
